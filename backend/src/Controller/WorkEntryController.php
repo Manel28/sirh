@@ -20,7 +20,7 @@ class WorkEntryController
         LeaveRepository $leaveRepository
     ): JsonResponse {
         try {
-            $month = $request->query->get('month'); // format: YYYY-MM
+            $month = $request->query->get('month');
 
             if (!$month) {
                 return new JsonResponse(['message' => 'Missing month'], 400);
@@ -47,7 +47,6 @@ class WorkEntryController
                 ];
             }
 
-            // Inject approved leaves as LV into the calendar
             $approvedLeaves = $leaveRepository->createQueryBuilder('l')
                 ->where('l.status = :status')
                 ->andWhere('l.startDate <= :end')
@@ -57,11 +56,6 @@ class WorkEntryController
                 ->setParameter('end', $end)
                 ->getQuery()
                 ->getResult();
-
-            $existingMap = [];
-            foreach ($data as $row) {
-                $existingMap[$row['userId'] . '_' . $row['date']] = true;
-            }
 
             foreach ($approvedLeaves as $leave) {
                 $leaveStart = $leave->getStartDate();
@@ -73,11 +67,11 @@ class WorkEntryController
                 }
 
                 $current = clone $leaveStart;
+
                 while ($current <= $leaveEnd) {
                     $dateString = $current->format('Y-m-d');
                     $key = $user->getId() . '_' . $dateString;
 
-                    // Leave overrides manual planning
                     $data = array_values(array_filter($data, function ($row) use ($key) {
                         return ($row['userId'] . '_' . $row['date']) !== $key;
                     }));
@@ -139,7 +133,6 @@ class WorkEntryController
                 return new JsonResponse(['message' => 'Invalid code'], 400);
             }
 
-            // If an approved leave exists on that date, force LV and block manual overwrite
             $approvedLeave = $leaveRepository->createQueryBuilder('l')
                 ->where('l.user = :user')
                 ->andWhere('l.status = :status')
@@ -162,7 +155,6 @@ class WorkEntryController
                 'workDate' => $date,
             ]);
 
-            // empty code = clear manual entry
             if ($code === '') {
                 if ($existing) {
                     $entityManager->remove($existing);
