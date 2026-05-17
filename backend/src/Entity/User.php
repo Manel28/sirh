@@ -22,14 +22,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 180)]
     private ?string $email = null;
 
-    /**
-     * @var list<string>
-     */
     #[ORM\Column]
     private array $roles = [];
 
     #[ORM\Column]
     private ?string $password = null;
+
+    #[ORM\Column(type: 'boolean')]
+    private bool $mustChangePassword = false;
 
     #[ORM\Column(length: 100, nullable: true)]
     private ?string $firstName = null;
@@ -46,38 +46,29 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $photo = null;
 
-    /**
-     * @var Collection<int, Leave>
-     */
     #[ORM\OneToMany(targetEntity: Leave::class, mappedBy: 'user')]
     private Collection $leaves;
 
-    /**
-     * @var Collection<int, WorkEntry>
-     */
     #[ORM\OneToMany(targetEntity: WorkEntry::class, mappedBy: 'user', orphanRemoval: true)]
     private Collection $workEntries;
+
+    #[ORM\OneToMany(targetEntity: Document::class, mappedBy: 'user', orphanRemoval: true)]
+    private Collection $documents;
 
     public function __construct()
     {
         $this->leaves = new ArrayCollection();
         $this->workEntries = new ArrayCollection();
+        $this->documents = new ArrayCollection();
     }
 
-    public function getId(): ?int
-    {
-        return $this->id;
-    }
+    public function getId(): ?int { return $this->id; }
 
-    public function getEmail(): ?string
-    {
-        return $this->email;
-    }
+    public function getEmail(): ?string { return $this->email; }
 
     public function setEmail(string $email): static
     {
         $this->email = $email;
-
         return $this;
     }
 
@@ -90,86 +81,71 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         $roles = $this->roles;
         $roles[] = 'ROLE_USER';
-
         return array_unique($roles);
     }
 
     public function setRoles(array $roles): static
     {
         $this->roles = $roles;
-
         return $this;
     }
 
-    public function getPassword(): ?string
-    {
-        return $this->password;
-    }
+    public function getPassword(): ?string { return $this->password; }
 
     public function setPassword(string $password): static
     {
         $this->password = $password;
-
         return $this;
     }
 
-    public function getFirstName(): ?string
+    public function isMustChangePassword(): bool
     {
-        return $this->firstName;
+        return $this->mustChangePassword;
     }
+
+    public function setMustChangePassword(bool $mustChangePassword): static
+    {
+        $this->mustChangePassword = $mustChangePassword;
+        return $this;
+    }
+
+    public function getFirstName(): ?string { return $this->firstName; }
 
     public function setFirstName(?string $firstName): static
     {
         $this->firstName = $firstName;
-
         return $this;
     }
 
-    public function getLastName(): ?string
-    {
-        return $this->lastName;
-    }
+    public function getLastName(): ?string { return $this->lastName; }
 
     public function setLastName(?string $lastName): static
     {
         $this->lastName = $lastName;
-
         return $this;
     }
 
-    public function getJobTitle(): ?string
-    {
-        return $this->jobTitle;
-    }
+    public function getJobTitle(): ?string { return $this->jobTitle; }
 
     public function setJobTitle(?string $jobTitle): static
     {
         $this->jobTitle = $jobTitle;
-
         return $this;
     }
 
-    public function getDepartment(): ?string
-    {
-        return $this->department;
-    }
+    public function getDepartment(): ?string { return $this->department; }
 
     public function setDepartment(?string $department): static
     {
         $this->department = $department;
-
         return $this;
     }
 
-    public function getPhoto(): ?string
-    {
-        return $this->photo;
-    }
+    public function getPhoto(): ?string { return $this->photo; }
 
     public function setPhoto(?string $photo): static
     {
         $this->photo = $photo;
-
         return $this;
     }
 
@@ -177,22 +153,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         $data = (array) $this;
         $data["\0" . self::class . "\0password"] = hash('crc32c', $this->password);
-
         return $data;
     }
 
     #[\Deprecated]
-    public function eraseCredentials(): void
-    {
-    }
+    public function eraseCredentials(): void {}
 
-    /**
-     * @return Collection<int, Leave>
-     */
-    public function getLeaves(): Collection
-    {
-        return $this->leaves;
-    }
+    public function getLeaves(): Collection { return $this->leaves; }
 
     public function addLeave(Leave $leave): static
     {
@@ -200,24 +167,16 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
             $this->leaves->add($leave);
             $leave->setUser($this);
         }
-
         return $this;
     }
 
     public function removeLeave(Leave $leave): static
     {
         $this->leaves->removeElement($leave);
-
         return $this;
     }
 
-    /**
-     * @return Collection<int, WorkEntry>
-     */
-    public function getWorkEntries(): Collection
-    {
-        return $this->workEntries;
-    }
+    public function getWorkEntries(): Collection { return $this->workEntries; }
 
     public function addWorkEntry(WorkEntry $workEntry): static
     {
@@ -225,7 +184,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
             $this->workEntries->add($workEntry);
             $workEntry->setUser($this);
         }
-
         return $this;
     }
 
@@ -234,6 +192,31 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         if ($this->workEntries->removeElement($workEntry)) {
             if ($workEntry->getUser() === $this) {
                 $workEntry->setUser(null);
+            }
+        }
+        return $this;
+    }
+
+    public function getDocuments(): Collection
+    {
+        return $this->documents;
+    }
+
+    public function addDocument(Document $document): static
+    {
+        if (!$this->documents->contains($document)) {
+            $this->documents->add($document);
+            $document->setUser($this);
+        }
+
+        return $this;
+    }
+
+    public function removeDocument(Document $document): static
+    {
+        if ($this->documents->removeElement($document)) {
+            if ($document->getUser() === $this) {
+                $document->setUser(null);
             }
         }
 

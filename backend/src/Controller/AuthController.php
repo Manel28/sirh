@@ -19,30 +19,25 @@ class AuthController
         try {
             $data = json_decode($request->getContent(), true);
 
-            if (!$data || !isset($data['email']) || !isset($data['password'])) {
-                return new JsonResponse([
-                    'message' => 'Missing email or password'
-                ], 400);
+            if (!$data || empty($data['email']) || empty($data['password'])) {
+                return new JsonResponse(['message' => 'Missing email or password'], 400);
             }
 
-            $user = $userRepository->findOneBy([
-                'email' => $data['email']
-            ]);
+            $email = strtolower(trim($data['email']));
+
+            $user = $userRepository->findOneBy(['email' => $email]);
 
             if (!$user) {
-                return new JsonResponse([
-                    'message' => 'User not found'
-                ], 404);
+                return new JsonResponse(['message' => 'User not found'], 404);
             }
 
             if (!$passwordHasher->isPasswordValid($user, $data['password'])) {
-                return new JsonResponse([
-                    'message' => 'Invalid password'
-                ], 401);
+                return new JsonResponse(['message' => 'Invalid password'], 401);
             }
 
             return new JsonResponse([
                 'message' => 'Login successful',
+                'mustChangePassword' => $user->isMustChangePassword(),
                 'user' => [
                     'id' => $user->getId(),
                     'email' => $user->getEmail(),
@@ -52,6 +47,7 @@ class AuthController
                     'jobTitle' => $user->getJobTitle(),
                     'department' => $user->getDepartment(),
                     'photo' => $user->getPhoto(),
+                    'mustChangePassword' => $user->isMustChangePassword(),
                 ]
             ]);
         } catch (\Throwable $e) {

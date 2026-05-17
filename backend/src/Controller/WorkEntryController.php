@@ -17,10 +17,12 @@ class WorkEntryController
     public function getWorkEntries(
         Request $request,
         WorkEntryRepository $workEntryRepository,
-        LeaveRepository $leaveRepository
+        LeaveRepository $leaveRepository,
+        UserRepository $userRepository
     ): JsonResponse {
         try {
             $month = $request->query->get('month');
+            $userId = $request->query->get('userId');
 
             if (!$month) {
                 return new JsonResponse(['message' => 'Missing month'], 400);
@@ -29,12 +31,23 @@ class WorkEntryController
             $start = new \DateTime($month . '-01');
             $end = (clone $start)->modify('last day of this month');
 
-            $entries = $workEntryRepository->createQueryBuilder('w')
+            $qb = $workEntryRepository->createQueryBuilder('w')
                 ->where('w.workDate BETWEEN :start AND :end')
                 ->setParameter('start', $start)
-                ->setParameter('end', $end)
-                ->getQuery()
-                ->getResult();
+                ->setParameter('end', $end);
+
+            if ($userId) {
+                $user = $userRepository->find($userId);
+
+                if (!$user) {
+                    return new JsonResponse(['message' => 'User not found'], 404);
+                }
+
+                $qb->andWhere('w.user = :user')
+                    ->setParameter('user', $user);
+            }
+
+            $entries = $qb->getQuery()->getResult();
 
             $data = [];
 
@@ -47,15 +60,20 @@ class WorkEntryController
                 ];
             }
 
-            $approvedLeaves = $leaveRepository->createQueryBuilder('l')
+            $leaveQb = $leaveRepository->createQueryBuilder('l')
                 ->where('l.status = :status')
                 ->andWhere('l.startDate <= :end')
                 ->andWhere('l.endDate >= :start')
                 ->setParameter('status', 'Approved')
                 ->setParameter('start', $start)
-                ->setParameter('end', $end)
-                ->getQuery()
-                ->getResult();
+                ->setParameter('end', $end);
+
+            if ($userId) {
+                $leaveQb->andWhere('l.user = :user')
+                    ->setParameter('user', $user);
+            }
+
+            $approvedLeaves = $leaveQb->getQuery()->getResult();
 
             foreach ($approvedLeaves as $leave) {
                 $leaveStart = $leave->getStartDate();
@@ -93,9 +111,7 @@ class WorkEntryController
 
             return new JsonResponse($data);
         } catch (\Throwable $e) {
-            return new JsonResponse([
-                'error' => $e->getMessage(),
-            ], 500);
+            return new JsonResponse(['error' => $e->getMessage()], 500);
         }
     }
 
@@ -128,7 +144,8 @@ class WorkEntryController
             $date = new \DateTime($data['date']);
             $code = strtoupper(trim((string) $data['code']));
 
-            $allowedCodes = ['', 'SS', 'TT', 'TR', 'AB', 'LV'];
+            $allowedCodes = ['', 'SS', 'TT', 'TR', 'AB'];
+
             if (!in_array($code, $allowedCodes, true)) {
                 return new JsonResponse(['message' => 'Invalid code'], 400);
             }
@@ -146,7 +163,7 @@ class WorkEntryController
 
             if ($approvedLeave) {
                 return new JsonResponse([
-                    'message' => 'This day is covered by an approved leave and is automatically set to LV.'
+                    'message' => 'This day is covered by an approved leave.'
                 ], 400);
             }
 
@@ -161,9 +178,7 @@ class WorkEntryController
                     $entityManager->flush();
                 }
 
-                return new JsonResponse([
-                    'message' => 'Entry cleared successfully'
-                ]);
+                return new JsonResponse(['message' => 'Entry cleared successfully']);
             }
 
             if ($existing) {
@@ -178,13 +193,9 @@ class WorkEntryController
 
             $entityManager->flush();
 
-            return new JsonResponse([
-                'message' => 'Saved successfully'
-            ]);
+            return new JsonResponse(['message' => 'Saved successfully']);
         } catch (\Throwable $e) {
-            return new JsonResponse([
-                'error' => $e->getMessage(),
-            ], 500);
+            return new JsonResponse(['error' => $e->getMessage()], 500);
         }
     }
 }

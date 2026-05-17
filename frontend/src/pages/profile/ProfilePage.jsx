@@ -8,10 +8,10 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   const [showEditModal, setShowEditModal] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
 
   const [form, setForm] = useState({
     firstName: "",
@@ -26,16 +26,31 @@ export default function ProfilePage() {
         setProfile(data);
       } catch (err) {
         console.error(err);
-        setError("Failed to load profile");
+        setError("Failed to load profile.");
       } finally {
         setLoading(false);
       }
     };
 
-    if (storedUser?.id) {
-      fetchProfile();
-    }
-  }, [storedUser]);
+    if (storedUser?.id) fetchProfile();
+  }, [storedUser?.id]);
+
+  const fullName =
+    [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") || "User";
+
+  const roleLabel = profile?.roles?.includes("ROLE_ADMIN")
+    ? "Admin / HR"
+    : "Collaborator";
+
+  const initials =
+    `${profile?.firstName?.[0] || ""}${profile?.lastName?.[0] || ""}`.trim() ||
+    profile?.email?.[0]?.toUpperCase() ||
+    "U";
+
+  const previewPhoto = useMemo(() => {
+    if (form.photoFile) return URL.createObjectURL(form.photoFile);
+    return profile?.photo || null;
+  }, [form.photoFile, profile?.photo]);
 
   const openEditModal = () => {
     setForm({
@@ -52,13 +67,6 @@ export default function ProfilePage() {
     setShowEditModal(false);
     setError("");
   };
-
-  const previewPhoto = useMemo(() => {
-    if (form.photoFile) {
-      return URL.createObjectURL(form.photoFile);
-    }
-    return profile?.photo || null;
-  }, [form.photoFile, profile?.photo]);
 
   const handleSaveProfile = async () => {
     try {
@@ -80,7 +88,6 @@ export default function ProfilePage() {
       setProfile(updatedUser);
 
       const currentUser = JSON.parse(localStorage.getItem("user") || "null");
-
       localStorage.setItem(
         "user",
         JSON.stringify({
@@ -96,56 +103,19 @@ export default function ProfilePage() {
       setError(
         err?.response?.data?.message ||
           err?.response?.data?.error ||
-          "Failed to update profile"
+          "Failed to update profile."
       );
     } finally {
       setSaving(false);
     }
   };
 
-  const fullName =
-    [profile?.firstName, profile?.lastName].filter(Boolean).join(" ") || "User";
-
-  const roleLabel = profile?.roles?.includes("ROLE_ADMIN")
-    ? "Admin / RH"
-    : "Collaborator";
-
-  const initials =
-    `${profile?.firstName?.[0] || ""}${profile?.lastName?.[0] || ""}`.trim() ||
-    profile?.email?.[0]?.toUpperCase() ||
-    "U";
-
   if (loading) {
     return (
       <AppLayout title="Profile">
         <div className="space-y-6">
-          <div className="rounded-[28px] overflow-hidden border border-slate-200 bg-white shadow-sm">
-            <div className="h-44 bg-slate-200 animate-pulse" />
-            <div className="px-6 md:px-8 pb-8 -mt-14">
-              <div className="animate-pulse flex flex-col lg:flex-row lg:items-end lg:justify-between gap-6">
-                <div className="flex items-end gap-5">
-                  <div className="w-32 h-32 rounded-full bg-slate-200 border-4 border-white" />
-                  <div className="space-y-3 pb-2">
-                    <div className="h-7 w-48 bg-slate-200 rounded-full" />
-                    <div className="h-5 w-36 bg-slate-200 rounded-full" />
-                    <div className="h-8 w-28 bg-slate-200 rounded-full" />
-                  </div>
-                </div>
-                <div className="h-28 w-full lg:w-72 bg-slate-100 rounded-3xl border border-slate-200" />
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-[32px] border border-slate-200 bg-white shadow-sm p-6 md:p-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Array.from({ length: 6 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="h-24 rounded-3xl bg-slate-100 border border-slate-200 animate-pulse"
-                />
-              ))}
-            </div>
-          </div>
+          <div className="h-48 animate-pulse rounded-3xl bg-slate-200" />
+          <div className="h-80 animate-pulse rounded-3xl border border-slate-200 bg-white" />
         </div>
       </AppLayout>
     );
@@ -154,10 +124,8 @@ export default function ProfilePage() {
   if (error && !profile) {
     return (
       <AppLayout title="Profile">
-        <div className="rounded-[28px] border border-red-200 bg-white p-8 shadow-sm">
-          <div className="rounded-3xl border border-red-200 bg-red-50 px-5 py-4 text-red-700">
-            {error}
-          </div>
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-700">
+          {error}
         </div>
       </AppLayout>
     );
@@ -167,175 +135,113 @@ export default function ProfilePage() {
     <AppLayout title="Profile">
       <div className="space-y-6">
         {successMessage && (
-          <div className="rounded-2xl border border-green-200 bg-green-50 px-5 py-4 text-green-700">
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-emerald-700">
             {successMessage}
           </div>
         )}
 
-        <div className="relative overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_10px_40px_rgba(15,23,42,0.08)]">
-          <div className="relative h-64 bg-gradient-to-r from-slate-900 via-blue-700 to-violet-600">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.30),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.18),transparent_24%)]" />
-            <div className="absolute top-8 right-10 w-32 h-32 rounded-full bg-white/10 blur-2xl" />
-            <div className="absolute bottom-0 left-16 w-44 h-44 rounded-full bg-cyan-300/10 blur-3xl" />
-          </div>
+        <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
+          <div className="h-24 bg-gradient-to-r from-[#12396b] via-blue-600 to-orange-500" />
 
-          <div className="px-6 md:px-8 pb-8 -mt-28 relative z-10">
-            <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-8">
-              <div className="flex flex-col md:flex-row md:items-end gap-6">
-                <div className="shrink-0">
-                  {profile?.photo ? (
-                    <div className="p-2 rounded-full bg-white shadow-2xl">
-                      <img
-                        src={profile.photo}
-                        alt="Profile"
-                        className="w-40 h-40 rounded-full object-cover border-[6px] border-white"
-                      />
-                    </div>
-                  ) : (
-                    <div className="w-40 h-40 rounded-full bg-white shadow-2xl border-[8px] border-white flex items-center justify-center text-5xl font-bold text-slate-700">
-                      {initials}
-                    </div>
-                  )}
-                </div>
-
-                <div className="pb-2">
-                  <div className="flex flex-wrap items-center gap-2 mb-4">
-                    <span className="inline-flex items-center rounded-full bg-white/90 text-[#12396b] px-4 py-1.5 text-sm font-semibold shadow-sm">
-                      Employee Profile
-                    </span>
-                    <span className="inline-flex items-center rounded-full bg-emerald-100 text-emerald-700 px-4 py-1.5 text-sm font-semibold">
-                      Active
-                    </span>
+          <div className="px-6 pb-7 md:px-8">
+            <div className="-mt-10 flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+              <div className="flex flex-col gap-5 md:flex-row md:items-start">
+                {profile?.photo ? (
+                  <img
+                    src={profile.photo}
+                    alt="Profile"
+                    className="h-24 w-24 rounded-3xl border-4 border-white object-cover shadow-lg"
+                  />
+                ) : (
+                  <div className="flex h-24 w-24 items-center justify-center rounded-3xl border-4 border-white bg-slate-100 text-3xl font-bold text-slate-700 shadow-lg">
+                    {initials}
                   </div>
+                )}
 
-                  <h3 className="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight leading-none">
+                <div className="pt-12 md:pt-11">
+                  <h1 className="text-3xl font-extrabold text-slate-900">
                     {fullName}
-                  </h3>
+                  </h1>
 
-                  <p className="text-slate-600 mt-3 text-lg md:text-2xl font-semibold">
+                  <p className="mt-2 text-slate-500">
                     {profile?.jobTitle || "No job title specified"}
                   </p>
 
-                  <div className="flex flex-wrap items-center gap-3 mt-5">
-                    <span className="inline-flex items-center rounded-full bg-blue-100 text-blue-700 px-4 py-2 text-sm font-semibold">
+                  <p className="mt-1 text-sm font-semibold text-slate-500">
+                    {profile?.department || "No department specified"}
+                  </p>
+
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700">
                       {roleLabel}
+                    </span>
+
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">
+                      Active
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 xl:min-w-[460px] xl:justify-end">
-                <MiniStatCard
-                  title="Profile"
-                  value={`${getProfileCompletion(profile)}%`}
-                  tone="blue"
-                />
-                <MiniStatCard
-                  title="Department"
-                  value={profile?.department || "-"}
-                  tone="violet"
-                />
-                <MiniStatCard
-                  title="Access"
-                  value={roleLabel}
-                  tone="emerald"
-                />
-                <button
-                  onClick={openEditModal}
-                  className="rounded-3xl border border-slate-200 bg-white px-5 py-4 text-left shadow-sm hover:shadow-md transition"
-                >
-                  <p className="text-xs uppercase tracking-wide text-slate-400">
-                    Action
-                  </p>
-                  <p className="text-sm font-bold mt-2 text-slate-800">
-                    Edit Profile
-                  </p>
-                </button>
-              </div>
+              <button
+                onClick={openEditModal}
+                className="mt-0 rounded-2xl bg-[#12396b] px-5 py-3 text-sm font-bold text-white shadow-lg transition hover:bg-[#0f2f58] md:mt-11"
+              >
+                Edit Profile
+              </button>
             </div>
           </div>
-        </div>
+        </section>
 
-        <div className="rounded-[32px] border border-slate-200 bg-white shadow-[0_10px_30px_rgba(15,23,42,0.06)] p-6 md:p-8">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-7">
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.06)] md:p-8">
+          <div className="mb-6 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <div>
-              <h4 className="text-2xl font-bold text-slate-900">
+              <h2 className="text-2xl font-bold text-slate-900">
                 Personal Information
-              </h4>
-              <p className="text-slate-500 text-sm mt-1">
-                Main identity and professional details
+              </h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Your identity and professional details.
               </p>
             </div>
 
-            <div className="h-2 w-28 rounded-full bg-gradient-to-r from-blue-500 via-violet-500 to-cyan-400" />
+            <div className="h-1.5 w-24 rounded-full bg-gradient-to-r from-[#12396b] to-orange-500" />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <InfoCard
-              label="First Name"
-              value={profile?.firstName}
-              tone="blue"
-              icon="👤"
-            />
-            <InfoCard
-              label="Last Name"
-              value={profile?.lastName}
-              tone="violet"
-              icon="🪪"
-            />
-            <InfoCard
-              label="Email Address"
-              value={profile?.email}
-              tone="cyan"
-              icon="✉️"
-            />
-            <InfoCard
-              label="Job Title"
-              value={profile?.jobTitle}
-              tone="amber"
-              icon="💼"
-            />
-            <InfoCard
-              label="Department"
-              value={profile?.department}
-              tone="emerald"
-              icon="🏢"
-            />
-            <InfoCard
-              label="Role"
-              value={roleLabel}
-              tone="rose"
-              icon="⭐"
-            />
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <InfoRow label="First Name" value={profile?.firstName} />
+            <InfoRow label="Last Name" value={profile?.lastName} />
+            <InfoRow label="Email Address" value={profile?.email} />
+            <InfoRow label="Job Title" value={profile?.jobTitle} />
+            <InfoRow label="Department" value={profile?.department} />
+            <InfoRow label="Role" value={roleLabel} />
           </div>
-        </div>
+        </section>
       </div>
 
       {showEditModal && (
-        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] flex items-center justify-center px-4">
-          <div className="w-full max-w-2xl rounded-[28px] bg-white shadow-2xl border border-slate-200 overflow-hidden">
-            <div className="bg-gradient-to-r from-slate-900 via-blue-700 to-violet-600 px-6 py-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="w-full max-w-xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl">
+            <div className="bg-gradient-to-r from-[#12396b] via-blue-600 to-orange-500 px-6 py-5">
               <h3 className="text-2xl font-bold text-white">Edit Profile</h3>
-              <p className="text-white/80 text-sm mt-1">
-                Update your personal information
+              <p className="mt-1 text-sm text-white/80">
+                Update your personal information.
               </p>
             </div>
 
-            <div className="p-6 md:p-8 space-y-5">
+            <div className="space-y-5 p-6">
               {error && (
-                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                   {error}
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 <FormField
                   label="First Name"
                   value={form.firstName}
                   onChange={(value) =>
                     setForm((prev) => ({ ...prev, firstName: value }))
                   }
-                  placeholder="Enter your first name"
                 />
 
                 <FormField
@@ -344,14 +250,14 @@ export default function ProfilePage() {
                   onChange={(value) =>
                     setForm((prev) => ({ ...prev, lastName: value }))
                   }
-                  placeholder="Enter your last name"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label className="mb-2 block text-sm font-semibold text-slate-700">
                   Profile Photo
                 </label>
+
                 <input
                   type="file"
                   accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
@@ -361,15 +267,16 @@ export default function ProfilePage() {
                       photoFile: e.target.files?.[0] || null,
                     }))
                   }
-                  className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition bg-white"
+                  className="w-full rounded-2xl border border-slate-300 bg-white px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
                 />
-                <p className="text-xs text-slate-500 mt-2">
-                  Accepted formats: JPG, PNG, WEBP. Max 5 MB.
+
+                <p className="mt-2 text-xs text-slate-500">
+                  Accepted formats: JPG, PNG, WEBP.
                 </p>
               </div>
 
-              <div className="rounded-3xl border border-slate-200 bg-slate-50 p-5">
-                <p className="text-sm font-semibold text-slate-700 mb-4">
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <p className="mb-3 text-sm font-semibold text-slate-700">
                   Preview
                 </p>
 
@@ -378,19 +285,20 @@ export default function ProfilePage() {
                     <img
                       src={previewPhoto}
                       alt="Preview"
-                      className="w-20 h-20 rounded-full object-cover border-4 border-white shadow"
+                      className="h-16 w-16 rounded-2xl object-cover"
                     />
                   ) : (
-                    <div className="w-20 h-20 rounded-full bg-slate-200 flex items-center justify-center text-2xl font-bold text-slate-600">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-xl font-bold text-slate-700">
                       {(form.firstName?.[0] || form.lastName?.[0] || "U").toUpperCase()}
                     </div>
                   )}
 
                   <div>
-                    <p className="text-lg font-bold text-slate-800">
-                      {[form.firstName, form.lastName].filter(Boolean).join(" ") || "User"}
+                    <p className="font-bold text-slate-900">
+                      {[form.firstName, form.lastName].filter(Boolean).join(" ") ||
+                        "User"}
                     </p>
-                    <p className="text-slate-500 text-sm">
+                    <p className="text-sm text-slate-500">
                       {profile?.jobTitle || "No job title specified"}
                     </p>
                   </div>
@@ -401,7 +309,7 @@ export default function ProfilePage() {
                 <button
                   onClick={closeEditModal}
                   disabled={saving}
-                  className="px-5 py-3 rounded-2xl border border-slate-300 text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
+                  className="rounded-2xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-50"
                 >
                   Cancel
                 </button>
@@ -409,7 +317,7 @@ export default function ProfilePage() {
                 <button
                   onClick={handleSaveProfile}
                   disabled={saving}
-                  className="px-6 py-3 rounded-2xl bg-gradient-to-r from-[#12396b] via-blue-600 to-violet-600 text-white font-semibold hover:opacity-95 transition disabled:opacity-50"
+                  className="rounded-2xl bg-gradient-to-r from-[#12396b] to-blue-600 px-6 py-3 text-sm font-bold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50"
                 >
                   {saving ? "Saving..." : "Save Changes"}
                 </button>
@@ -422,82 +330,29 @@ export default function ProfilePage() {
   );
 }
 
-function FormField({ label, value, onChange, placeholder }) {
+function InfoRow({ label, value }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
+      <p className="text-sm font-semibold text-slate-500">{label}</p>
+      <p className="mt-2 break-words text-base font-bold text-slate-900">
+        {value || "-"}
+      </p>
+    </div>
+  );
+}
+
+function FormField({ label, value, onChange }) {
   return (
     <div>
-      <label className="block text-sm font-medium text-slate-700 mb-2">
+      <label className="mb-2 block text-sm font-semibold text-slate-700">
         {label}
       </label>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition"
+        className="w-full rounded-2xl border border-slate-300 px-4 py-3 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
       />
     </div>
   );
-}
-
-function InfoCard({ label, value, tone = "blue", icon = "•" }) {
-  const styles = {
-    blue: "from-blue-50 to-white border-blue-100 text-blue-700",
-    violet: "from-violet-50 to-white border-violet-100 text-violet-700",
-    cyan: "from-cyan-50 to-white border-cyan-100 text-cyan-700",
-    amber: "from-amber-50 to-white border-amber-100 text-amber-700",
-    emerald: "from-emerald-50 to-white border-emerald-100 text-emerald-700",
-    rose: "from-rose-50 to-white border-rose-100 text-rose-700",
-  };
-
-  const toneStyle = styles[tone] || styles.blue;
-
-  return (
-    <div
-      className={`rounded-3xl border bg-gradient-to-br px-5 py-5 transition hover:shadow-md ${toneStyle}`}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="text-sm text-slate-500 mb-2">{label}</p>
-          <p className="text-base font-bold text-slate-800 break-words">
-            {value || "-"}
-          </p>
-        </div>
-
-        <div className="w-10 h-10 rounded-2xl bg-white shadow-sm flex items-center justify-center text-lg">
-          {icon}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function MiniStatCard({ title, value, tone = "blue" }) {
-  const styles = {
-    blue: "bg-blue-50 border-blue-100 text-blue-700",
-    violet: "bg-violet-50 border-violet-100 text-violet-700",
-    emerald: "bg-emerald-50 border-emerald-100 text-emerald-700",
-  };
-
-  const toneStyle = styles[tone] || styles.blue;
-
-  return (
-    <div className={`rounded-3xl border px-4 py-4 ${toneStyle}`}>
-      <p className="text-xs uppercase tracking-wide opacity-70">{title}</p>
-      <p className="text-sm font-bold mt-2 break-words">{value}</p>
-    </div>
-  );
-}
-
-function getProfileCompletion(profile) {
-  const fields = [
-    profile?.firstName,
-    profile?.lastName,
-    profile?.email,
-    profile?.jobTitle,
-    profile?.department,
-    profile?.photo,
-  ];
-
-  const filled = fields.filter(Boolean).length;
-  return Math.round((filled / fields.length) * 100);
 }

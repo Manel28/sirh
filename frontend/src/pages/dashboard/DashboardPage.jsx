@@ -3,6 +3,15 @@ import AppLayout from "../../layouts/AppLayout";
 import { useNavigate } from "react-router-dom";
 import { getLeaves } from "../../services/leaveService";
 import { getCollaborators } from "../../services/userService";
+import {
+  CalendarDays,
+  CheckCircle2,
+  Clock3,
+  FileText,
+  ShieldCheck,
+  Users,
+  XCircle,
+} from "lucide-react";
 
 export default function DashboardPage() {
   const navigate = useNavigate();
@@ -47,8 +56,7 @@ export default function DashboardPage() {
   }, [isAdmin]);
 
   const stats = useMemo(() => {
-    const today = new Date();
-    const todayStr = formatDateLocal(today);
+    const todayStr = formatDateLocal(new Date());
 
     if (!isAdmin) {
       const pendingRequests = leaves.filter(
@@ -59,22 +67,13 @@ export default function DashboardPage() {
         (leave) => leave.status === "Approved"
       );
 
-      const approvedCount = approvedLeaves.length;
-
-      const usedDays = approvedLeaves.reduce((total, leave) => {
-        return total + countWorkingDays(leave.start, leave.end);
-      }, 0);
-
-      const remainingLeave = Math.max(25 - usedDays, 0);
-
       const upcomingApproved = approvedLeaves
         .filter((leave) => leave.start >= todayStr)
         .sort((a, b) => new Date(a.start) - new Date(b.start))[0];
 
       return {
         pendingRequests,
-        approvedCount,
-        remainingLeave,
+        approvedCount: approvedLeaves.length,
         nextApprovedLeave: upcomingApproved
           ? `${formatShortDate(upcomingApproved.start)} → ${formatShortDate(
               upcomingApproved.end
@@ -83,78 +82,84 @@ export default function DashboardPage() {
       };
     }
 
-    const pendingRequests = leaves.filter(
-      (leave) => leave.status === "Pending"
-    ).length;
-
-    const rejectedRequests = leaves.filter(
-      (leave) => leave.status === "Rejected"
-    ).length;
-
-    const approvedRequests = leaves.filter(
-      (leave) => leave.status === "Approved"
-    ).length;
-
-    const employeesCount = collaborators.filter(
+    const employeesOnly = collaborators.filter(
       (item) => !item.roles?.includes("ROLE_ADMIN")
-    ).length;
+    );
 
     return {
-      employeesCount,
-      pendingRequests,
-      approvedRequests,
-      rejectedRequests,
+      collaboratorsCount: employeesOnly.length,
+      pendingRequests: leaves.filter((leave) => leave.status === "Pending")
+        .length,
+      approvedRequests: leaves.filter((leave) => leave.status === "Approved")
+        .length,
+      rejectedRequests: leaves.filter((leave) => leave.status === "Rejected")
+        .length,
     };
   }, [isAdmin, leaves, collaborators]);
 
+  const recentLeaves = useMemo(() => {
+    return [...leaves]
+      .sort((a, b) => new Date(b.start) - new Date(a.start))
+      .slice(0, 5);
+  }, [leaves]);
+
+  const recentCollaborators = useMemo(() => {
+    return [...collaborators]
+      .filter((item) => !item.roles?.includes("ROLE_ADMIN"))
+      .slice(0, 5);
+  }, [collaborators]);
+
   return (
     <AppLayout title="Dashboard">
-      <div className="space-y-8">
-        <section className="relative overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.08)]">
-          <div className="relative bg-gradient-to-r from-slate-900 via-blue-700 to-violet-600 px-6 py-10 md:px-8 md:py-12">
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.25),transparent_28%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.18),transparent_24%)]" />
-            <div className="absolute top-4 right-8 h-24 w-24 rounded-full bg-white/10 blur-2xl" />
-            <div className="absolute bottom-0 left-10 h-32 w-32 rounded-full bg-cyan-300/10 blur-3xl" />
+      <div className="space-y-7">
+        <section className="relative overflow-hidden rounded-[32px] border border-white/40 bg-gradient-to-r from-[#12396b] via-blue-600 to-orange-500 shadow-[0_20px_60px_rgba(18,57,107,0.18)]">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.28),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.22),transparent_28%)]" />
 
-            <div className="relative z-10 flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-              <div className="max-w-2xl">
-                <div className="mb-4 inline-flex items-center rounded-full bg-white/15 px-4 py-2 text-sm font-medium text-white/90 backdrop-blur">
-                  {isAdmin ? "HR Dashboard" : "Employee Dashboard"}
+          <div className="relative px-6 py-9 md:px-9 md:py-11">
+            <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/15 px-4 py-2 text-sm font-semibold text-white/90 backdrop-blur">
+                  <ShieldCheck size={16} />
+                  {isAdmin ? "HR Administration" : "Employee Workspace"}
                 </div>
 
-                <h3 className="text-3xl font-extrabold tracking-tight text-white md:text-5xl">
-                  Welcome back, {firstName}
-                </h3>
+                <h1 className="text-3xl font-black tracking-tight text-white md:text-5xl">
+                  Welcome, {firstName}
+                </h1>
 
-                <p className="mt-3 max-w-xl text-base text-white/80 md:text-lg">
+                <p className="mt-4 max-w-2xl text-sm leading-7 text-white/85 md:text-base">
                   {isAdmin
-                    ? "Manage employees, review leave requests, and keep your HR space organized."
-                    : "Access your leaves, calendar, and HR documents from one place."}
+                    ? "Monitor HR activity, review leave requests, and manage your workforce from one clean workspace."
+                    : "Manage your leave requests, calendar, and HR documents from one place."}
                 </p>
               </div>
 
-              <div className="flex items-center gap-4 rounded-[28px] border border-white/15 bg-white/10 p-4 backdrop-blur-md shadow-xl">
+              <div className="flex items-center gap-4 rounded-3xl border border-white/20 bg-white/15 p-4 backdrop-blur-xl shadow-xl">
                 {user?.photo ? (
                   <img
                     src={
                       user.photo.startsWith("http")
                         ? user.photo
-                        : `http://127.0.0.1:8000/${user.photo}`
+                        : `http://localhost:8001/${user.photo}`
                     }
                     alt="Profile"
-                    className="h-20 w-20 rounded-2xl object-cover border-4 border-white/50 shadow-lg"
+                    className="h-16 w-16 rounded-2xl border-2 border-white/40 object-cover"
                   />
                 ) : (
-                  <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white/20 text-2xl font-bold text-white border border-white/20">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-white/20 text-xl font-black text-white">
                     {initials}
                   </div>
                 )}
 
-                <div>
-                  <p className="text-sm text-white/70">Signed in as</p>
-                  <p className="text-lg font-bold text-white">{fullName}</p>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-white/70">
+                    Signed in as
+                  </p>
+                  <p className="truncate text-base font-bold text-white">
+                    {fullName}
+                  </p>
                   <p className="text-sm text-white/80">
-                    {isAdmin ? "Admin / RH" : "Collaborator"}
+                    {isAdmin ? "Admin / HR" : "Collaborator"}
                   </p>
                 </div>
               </div>
@@ -162,48 +167,48 @@ export default function DashboardPage() {
           </div>
         </section>
 
-        <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-4">
+        <section
+          className={`grid grid-cols-1 gap-5 sm:grid-cols-2 ${
+            isAdmin ? "xl:grid-cols-4" : "xl:grid-cols-3"
+          }`}
+        >
           {loadingStats ? (
-            Array.from({ length: 4 }).map((_, index) => (
+            Array.from({ length: isAdmin ? 4 : 3 }).map((_, index) => (
               <div
                 key={index}
-                className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)] animate-pulse"
+                className="animate-pulse rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
               >
-                <div className="mb-4 h-12 w-12 rounded-2xl bg-slate-200" />
-                <div className="mb-3 h-4 w-24 rounded bg-slate-200" />
-                <div className="mb-3 h-8 w-20 rounded bg-slate-200" />
-                <div className="h-4 w-32 rounded bg-slate-100" />
+                <div className="mb-5 h-14 w-14 rounded-2xl bg-slate-200" />
+                <div className="mb-3 h-4 w-28 rounded bg-slate-200" />
+                <div className="mb-3 h-9 w-20 rounded bg-slate-200" />
+                <div className="h-4 w-36 rounded bg-slate-100" />
               </div>
             ))
           ) : isAdmin ? (
             <>
               <StatCard
-                title="Employees"
-                value={stats.employeesCount}
-                subtitle="Active collaborators"
-                icon="👥"
-                accent="from-blue-600 to-cyan-500"
+                title="Collaborators"
+                value={stats.collaboratorsCount}
+                subtitle="Active employee accounts"
+                icon={Users}
               />
               <StatCard
                 title="Pending Requests"
                 value={stats.pendingRequests}
-                subtitle="Waiting for validation"
-                icon="⏳"
-                accent="from-amber-500 to-orange-500"
+                subtitle="Waiting for HR review"
+                icon={Clock3}
               />
               <StatCard
                 title="Approved Requests"
                 value={stats.approvedRequests}
                 subtitle="Validated leave requests"
-                icon="✅"
-                accent="from-emerald-600 to-teal-500"
+                icon={CheckCircle2}
               />
               <StatCard
                 title="Rejected Requests"
                 value={stats.rejectedRequests}
-                subtitle="Rejected so far"
-                icon="❌"
-                accent="from-violet-600 to-pink-500"
+                subtitle="Requests declined"
+                icon={XCircle}
               />
             </>
           ) : (
@@ -212,185 +217,239 @@ export default function DashboardPage() {
                 title="Pending Requests"
                 value={stats.pendingRequests}
                 subtitle="Still waiting for response"
-                icon="⏳"
-                accent="from-amber-500 to-orange-500"
+                icon={Clock3}
               />
               <StatCard
                 title="Approved Leaves"
                 value={stats.approvedCount}
                 subtitle="Validated leave requests"
-                icon="✅"
-                accent="from-emerald-600 to-teal-500"
-              />
-              <StatCard
-                title="Remaining Leave"
-                value={stats.remainingLeave}
-                subtitle="Estimated remaining days"
-                icon="🌴"
-                accent="from-blue-600 to-cyan-500"
+                icon={CheckCircle2}
               />
               <StatCard
                 title="Next Leave"
                 value={stats.nextApprovedLeave}
                 subtitle="Your next approved period"
-                icon="📅"
-                accent="from-violet-600 to-pink-500"
+                icon={CalendarDays}
                 compact
               />
             </>
           )}
         </section>
 
-        <section className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {isAdmin ? (
-            <>
-              <DashboardCard
-                title="Leave Requests"
-                description="Review and manage all employee leave requests."
-                icon="🗂️"
-                accent="from-blue-600 to-cyan-500"
-                badge="HR"
-                onClick={() => navigate("/leaves")}
-              />
+        {isAdmin ? (
+          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+            <Panel
+              title="Recent leave requests"
+              action="View all"
+              onClick={() => navigate("/leaves")}
+            >
+              {recentLeaves.length > 0 ? (
+                <div className="divide-y divide-slate-100">
+                  {recentLeaves.map((leave) => (
+                    <div
+                      key={leave.id}
+                      className="flex items-center justify-between gap-4 py-4"
+                    >
+                      <div>
+                        <p className="font-bold text-slate-900">
+                          {leave.user?.firstName ||
+                            leave.firstName ||
+                            "Employee"}{" "}
+                          {leave.user?.lastName || leave.lastName || ""}
+                        </p>
+                        <p className="text-sm text-slate-500">
+                          {formatShortDate(leave.start)} →{" "}
+                          {formatShortDate(leave.end)}
+                        </p>
+                      </div>
 
-              <DashboardCard
-                title="Calendar"
-                description="View the HR calendar and team planning."
-                icon="📅"
-                accent="from-violet-600 to-fuchsia-500"
-                badge="Planning"
-                onClick={() => navigate("/calendar")}
-              />
+                      <StatusBadge status={leave.status} />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState text="No leave requests yet." />
+              )}
+            </Panel>
 
-              <DashboardCard
-                title="Employees"
-                description="Access employee information and management tools."
-                icon="👥"
-                accent="from-emerald-600 to-teal-500"
-                badge="People"
-                onClick={() => navigate("/employees")}
-              />
-            </>
-          ) : (
-            <>
-              <DashboardCard
-                title="My Calendar"
-                description="View your personal work and leave calendar."
-                icon="🗓️"
-                accent="from-blue-600 to-cyan-500"
-                badge="Schedule"
-                onClick={() => navigate("/calendar")}
-              />
+            <Panel
+  title="Recent collaborators"
+  action="Manage"
+  onClick={() => navigate("/admin/collaborators")}
+>
+              {recentCollaborators.length > 0 ? (
+                <div className="divide-y divide-slate-100">
+                  {recentCollaborators.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between gap-4 py-4"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        {item.photo ? (
+                          <img
+                            src={
+                              item.photo.startsWith("http")
+                                ? item.photo
+                                : `http://localhost:8001/${item.photo}`
+                            }
+                            alt="Profile"
+                            className="h-11 w-11 rounded-2xl object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#12396b] to-orange-500 text-sm font-black text-white">
+                            {item.firstName?.[0] || item.email?.[0] || "U"}
+                          </div>
+                        )}
 
-              <DashboardCard
-                title="My Leaves"
-                description="Track your leave requests and their status."
-                icon="🌴"
-                accent="from-violet-600 to-pink-500"
-                badge="Requests"
-                onClick={() => navigate("/leaves")}
-              />
+                        <div className="min-w-0">
+                          <p className="truncate font-bold text-slate-900">
+                            {[item.firstName, item.lastName]
+                              .filter(Boolean)
+                              .join(" ") || "Collaborator"}
+                          </p>
+                          <p className="truncate text-sm text-slate-500">
+                            {item.jobTitle || item.email}
+                          </p>
+                        </div>
+                      </div>
 
-              <DashboardCard
-                title="My Documents"
-                description="Access your HR documents and files."
-                icon="📄"
-                accent="from-amber-500 to-orange-500"
-                badge="Files"
-                onClick={() => navigate("/documents")}
-              />
-            </>
-          )}
-        </section>
+                      <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-bold text-orange-600">
+                        {item.department || "Team"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState text="No collaborators yet." />
+              )}
+            </Panel>
+          </section>
+        ) : (
+          <section className="grid grid-cols-1 gap-5 md:grid-cols-3">
+            <DashboardCard
+              title="My Calendar"
+              description="View your personal work and leave calendar."
+              icon={CalendarDays}
+              onClick={() => navigate("/calendar")}
+            />
+            <DashboardCard
+              title="My Leaves"
+              description="Track your leave requests and their status."
+              icon={Clock3}
+              onClick={() => navigate("/leaves")}
+            />
+            <DashboardCard
+              title="My Documents"
+              description="Access your HR documents and files."
+              icon={FileText}
+              onClick={() => navigate("/documents")}
+            />
+          </section>
+        )}
       </div>
     </AppLayout>
   );
 }
 
-function StatCard({ title, value, subtitle, icon, accent, compact = false }) {
+function StatCard({ title, value, subtitle, icon: Icon, compact = false }) {
   return (
-    <div className="relative overflow-hidden rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
-      <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${accent}`} />
+    <div className="group relative overflow-hidden rounded-3xl border border-white/40 bg-white/85 p-6 shadow-[0_10px_40px_rgba(15,23,42,0.08)] backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_rgba(18,57,107,0.15)]">
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/40 via-transparent to-orange-50/40 opacity-0 transition duration-500 group-hover:opacity-100" />
 
-      <div className="mb-4 flex items-center justify-between">
-        <div
-          className={`flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br ${accent} text-xl shadow-lg`}
-        >
-          {icon}
+      <div className="relative z-10">
+        <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#12396b] to-orange-500 text-white shadow-lg">
+          <Icon size={26} />
         </div>
-      </div>
 
-      <p className="text-sm font-medium text-slate-500">{title}</p>
-      <p
-        className={`mt-2 break-words font-extrabold text-slate-900 ${
-          compact ? "text-lg leading-7" : "text-4xl"
-        }`}
-      >
-        {value ?? "-"}
-      </p>
-      <p className="mt-3 text-sm leading-6 text-slate-500">{subtitle}</p>
+        <p className="text-sm font-bold uppercase tracking-wide text-slate-500">
+          {title}
+        </p>
+
+        <p
+          className={`mt-3 break-words font-black tracking-tight text-slate-900 ${
+            compact ? "text-lg leading-7" : "text-4xl"
+          }`}
+        >
+          {value ?? "-"}
+        </p>
+
+        <p className="mt-3 text-sm leading-6 text-slate-500">{subtitle}</p>
+      </div>
     </div>
   );
 }
 
-function DashboardCard({ title, description, icon, accent, badge, onClick }) {
+function DashboardCard({ title, description, icon: Icon, onClick }) {
   return (
     <button
       onClick={onClick}
-      className="group relative overflow-hidden rounded-[28px] border border-slate-200 bg-white p-6 text-left shadow-[0_10px_30px_rgba(15,23,42,0.06)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(15,23,42,0.12)]"
+      className="group relative overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 text-left shadow-[0_10px_35px_rgba(15,23,42,0.06)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_rgba(18,57,107,0.12)]"
     >
-      <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${accent}`} />
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-orange-50/30 opacity-0 transition duration-500 group-hover:opacity-100" />
 
-      <div className="mb-5 flex items-start justify-between gap-4">
-        <div
-          className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${accent} text-2xl shadow-lg`}
-        >
-          <span>{icon}</span>
+      <div className="relative z-10">
+        <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#12396b] to-orange-500 text-white shadow-lg">
+          <Icon size={28} />
         </div>
 
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-          {badge}
-        </span>
-      </div>
+        <h3 className="text-2xl font-black tracking-tight text-slate-900 transition group-hover:text-[#12396b]">
+          {title}
+        </h3>
 
-      <h3 className="text-2xl font-extrabold text-slate-900 transition group-hover:text-blue-700">
-        {title}
-      </h3>
+        <p className="mt-3 text-sm leading-7 text-slate-500">{description}</p>
 
-      <p className="mt-3 text-sm leading-6 text-slate-500">{description}</p>
-
-      <div className="mt-6 flex items-center gap-2 text-sm font-semibold text-slate-700">
-        <span className="transition group-hover:translate-x-1">Open section</span>
-        <span>→</span>
+        <div className="mt-6 flex items-center gap-2 text-sm font-bold text-[#12396b]">
+          <span className="transition group-hover:translate-x-1">
+            Open section
+          </span>
+          <span>→</span>
+        </div>
       </div>
     </button>
   );
 }
 
-function countWorkingDays(startDateString, endDateString) {
-  const start = new Date(startDateString);
-  const end = new Date(endDateString);
+function Panel({ title, action, onClick, children }) {
+  return (
+    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
+      <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-slate-50 to-orange-50/40 px-6 py-5">
+        <h3 className="text-lg font-black text-slate-900">{title}</h3>
 
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return 0;
-  }
+        {action && (
+          <button
+            onClick={onClick}
+            className="rounded-full bg-[#12396b] px-4 py-2 text-sm font-bold text-white transition hover:bg-[#0f2f58]"
+          >
+            {action}
+          </button>
+        )}
+      </div>
 
-  if (end < start) {
-    return 0;
-  }
+      <div className="px-6">{children}</div>
+    </div>
+  );
+}
 
-  let count = 0;
-  const current = new Date(start);
+function StatusBadge({ status }) {
+  const styles = {
+    Pending: "bg-amber-50 text-amber-700 border-amber-200",
+    Approved: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    Rejected: "bg-rose-50 text-rose-700 border-rose-200",
+  };
 
-  while (current <= end) {
-    const day = current.getDay();
-    if (day !== 0 && day !== 6) {
-      count += 1;
-    }
-    current.setDate(current.getDate() + 1);
-  }
+  return (
+    <span
+      className={`rounded-full border px-3 py-1 text-xs font-bold ${
+        styles[status] || "bg-slate-50 text-slate-600 border-slate-200"
+      }`}
+    >
+      {status || "Unknown"}
+    </span>
+  );
+}
 
-  return count;
+function EmptyState({ text }) {
+  return <div className="py-8 text-center text-sm text-slate-500">{text}</div>;
 }
 
 function formatDateLocal(date) {

@@ -1,14 +1,48 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { getNotifications } from "../services/notificationService";
 
 export default function AppLayout({ title, children }) {
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+
   const user = JSON.parse(localStorage.getItem("user") || "null");
   const isAdmin = user?.roles?.includes("ROLE_ADMIN");
 
   const fullName =
-    [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "Guest";
+    [user?.firstName, user?.lastName].filter(Boolean).join(" ") ||
+    user?.email ||
+    "Guest";
+
+  useEffect(() => {
+    const fetchUnreadNotifications = async () => {
+      if (!user?.id) return;
+
+      try {
+        const data = await getNotifications(user.id);
+        const count = Array.isArray(data)
+          ? data.filter((item) => !item.isRead).length
+          : 0;
+
+        setUnreadNotifications(count);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+
+    fetchUnreadNotifications();
+  }, [user?.id]);
+
+  const goTo = (path) => {
+    navigate(path);
+    setMenuOpen(false);
+  };
 
   const handleLogout = () => {
+    const confirmed = window.confirm("Are you sure you want to log out?");
+    if (!confirmed) return;
+
     localStorage.removeItem("user");
     navigate("/");
   };
@@ -16,84 +50,150 @@ export default function AppLayout({ title, children }) {
   return (
     <div className="min-h-screen bg-slate-100">
       <header className="bg-[#0b2a55] text-white shadow">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4">
+          <div className="flex items-center justify-between gap-4">
             <h1
-              className="text-xl font-bold cursor-pointer"
-              onClick={() => navigate("/dashboard")}
+              className="text-xl font-bold cursor-pointer shrink-0"
+              onClick={() => goTo("/dashboard")}
             >
               HRIS
             </h1>
 
-            <nav className="flex items-center gap-5 text-sm flex-wrap">
-              <button
-                onClick={() => navigate("/dashboard")}
-                className="hover:text-blue-200 transition"
-              >
-                Dashboard
-              </button>
+            <nav className="hidden lg:flex items-center gap-5 text-sm">
+              <NavButton onClick={() => goTo("/dashboard")}>Dashboard</NavButton>
+
+              <NavButton onClick={() => goTo("/leaves")}>
+                {isAdmin ? "Leave Requests" : "My Leaves"}
+              </NavButton>
+
+              <NavButton onClick={() => goTo("/calendar")}>Calendar</NavButton>
+
+              <NavButton onClick={() => goTo("/documents")}>Documents</NavButton>
+
+              <NavButton onClick={() => goTo("/profile")}>Profile</NavButton>
 
               <button
-                onClick={() => navigate("/leaves")}
-                className="hover:text-blue-200 transition"
+                onClick={() => goTo("/notifications")}
+                className="relative hover:text-blue-200 transition"
+                title="Notifications"
               >
-                {isAdmin ? "Leave Requests" : "My Leaves"}
+                🔔
+                {unreadNotifications > 0 && (
+                  <span className="absolute -top-2 -right-3 bg-red-500 text-white text-[10px] rounded-full px-1.5 py-0.5">
+                    {unreadNotifications}
+                  </span>
+                )}
               </button>
 
               {isAdmin && (
                 <button
-                  onClick={() => navigate("/admin/collaborators")}
-                  className="hover:text-blue-200 transition"
+                  onClick={() => goTo("/admin/collaborators")}
+                  className="bg-white/10 px-3 py-1.5 rounded-lg hover:bg-white/20 transition font-semibold"
                 >
                   Collaborators
                 </button>
               )}
-
-              <button
-                onClick={() => navigate("/documents")}
-                className="hover:text-blue-200 transition"
-              >
-                Documents
-              </button>
-
-              <button
-                onClick={() => navigate("/profile")}
-                className="hover:text-blue-200 transition"
-              >
-                Profile
-              </button>
             </nav>
-          </div>
 
-          <div className="flex items-center gap-4 text-sm">
-            {user?.photo ? (
-              <img
-                src={user.photo}
-                alt="Profile"
-                className="w-10 h-10 rounded-full object-cover border border-white/30"
-              />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center font-semibold">
-                {user?.firstName?.[0] || user?.email?.[0] || "U"}
-              </div>
-            )}
+            <div className="hidden sm:flex items-center gap-4 text-sm">
+              <span className="font-medium max-w-[180px] truncate">
+                {fullName}
+              </span>
 
-            <span className="font-medium">{fullName}</span>
+              <button
+                onClick={handleLogout}
+                className="text-red-300 hover:text-red-200 transition"
+              >
+                Logout
+              </button>
+            </div>
 
             <button
-              onClick={handleLogout}
-              className="text-red-300 hover:text-red-200 transition"
+              onClick={() => setMenuOpen((prev) => !prev)}
+              className="lg:hidden rounded-xl bg-white/10 px-3 py-2 text-sm font-bold hover:bg-white/20 transition"
             >
-              Logout
+              {menuOpen ? "Close" : "Menu"}
             </button>
           </div>
+
+          {menuOpen && (
+            <div className="lg:hidden mt-4 rounded-2xl bg-white/10 p-4 backdrop-blur">
+              <div className="mb-4 flex items-center justify-between gap-3 border-b border-white/10 pb-4">
+                <span className="text-sm font-semibold truncate">
+                  {fullName}
+                </span>
+
+                <button
+                  onClick={handleLogout}
+                  className="text-sm text-red-300 font-semibold"
+                >
+                  Logout
+                </button>
+              </div>
+
+              <nav className="grid gap-2 text-sm">
+                <MobileButton onClick={() => goTo("/dashboard")}>
+                  Dashboard
+                </MobileButton>
+
+                <MobileButton onClick={() => goTo("/leaves")}>
+                  {isAdmin ? "Leave Requests" : "My Leaves"}
+                </MobileButton>
+
+                <MobileButton onClick={() => goTo("/calendar")}>
+                  Calendar
+                </MobileButton>
+
+                <MobileButton onClick={() => goTo("/documents")}>
+                  Documents
+                </MobileButton>
+
+                <MobileButton onClick={() => goTo("/profile")}>
+                  Profile
+                </MobileButton>
+
+                <MobileButton onClick={() => goTo("/notifications")}>
+                  Notifications{" "}
+                  {unreadNotifications > 0 ? `(${unreadNotifications})` : ""}
+                </MobileButton>
+
+                {isAdmin && (
+                  <MobileButton onClick={() => goTo("/admin/collaborators")}>
+                    Collaborators
+                  </MobileButton>
+                )}
+              </nav>
+            </div>
+          )}
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
-        <h2 className="text-4xl font-bold text-slate-800 mb-8">{title}</h2>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-slate-800 mb-6 sm:mb-8 break-words">
+          {title}
+        </h2>
+
         {children}
       </main>
     </div>
+  );
+}
+
+function NavButton({ children, onClick }) {
+  return (
+    <button onClick={onClick} className="hover:text-blue-200 transition">
+      {children}
+    </button>
+  );
+}
+
+function MobileButton({ children, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="w-full rounded-xl px-4 py-3 text-left font-semibold hover:bg-white/10 transition"
+    >
+      {children}
+    </button>
   );
 }

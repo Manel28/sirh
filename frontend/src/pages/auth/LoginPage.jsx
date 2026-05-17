@@ -27,7 +27,7 @@ export default function LoginPage() {
       setLoading(true);
       setError("");
 
-      const response = await axios.post("http://127.0.0.1:8000/api/login", {
+      const response = await axios.post("http://localhost:8001/api/login", {
         email: form.email,
         password: form.password,
       });
@@ -35,7 +35,12 @@ export default function LoginPage() {
       const user = response.data.user;
 
       localStorage.setItem("user", JSON.stringify(user));
-      navigate("/dashboard");
+
+      if (response.data.mustChangePassword || user.mustChangePassword) {
+        navigate("/change-password");
+      } else {
+        navigate("/dashboard");
+      }
     } catch (err) {
       console.error(err);
       setError(

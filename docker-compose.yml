@@ -1,0 +1,44 @@
+services:
+  database:
+    image: mariadb:10.4
+    container_name: sirh_database
+    restart: always
+    environment:
+      MYSQL_DATABASE: si_rh
+      MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+    ports:
+      - "3310:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+
+  backend:
+    build: ./backend
+    container_name: sirh_backend
+    restart: always
+    ports:
+      - "8001:80"
+    depends_on:
+      - database
+    environment:
+      DATABASE_URL: "mysql://root:@database:3306/si_rh?serverVersion=10.4.32-MariaDB&charset=utf8mb4"
+
+  frontend:
+    build: ./frontend
+    container_name: sirh_frontend
+    restart: always
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: sirh_phpmyadmin
+    restart: always
+    ports:
+      - "8080:80"
+    environment:
+      PMA_HOST: database
+    depends_on:
+      - database
+volumes:
+  db_data:

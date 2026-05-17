@@ -1,20 +1,26 @@
 import { createBrowserRouter } from "react-router-dom";
 import LoginPage from "../pages/auth/LoginPage";
+import ChangePasswordPage from "../pages/auth/ChangePasswordPage";
 import DashboardPage from "../pages/dashboard/DashboardPage";
 import LeavesPage from "../pages/leaves/LeavesPage";
 import DocumentsPage from "../pages/documents/DocumentsPage";
-import PayrollPage from "../pages/payroll/PayrollPage";
+
 import ProfilePage from "../pages/profile/ProfilePage";
-import EmployeesPage from "../pages/employees/EmployeesPage";
+
 import CalendarPage from "../pages/calendar/CalendarPage";
 import CollaboratorsPage from "../pages/admin/CollaboratorsPage";
 import ProtectedRoute from "../components/ProtectedRoute";
 import AdminRoute from "../components/AdminRoute";
+import NotificationsPage from "../pages/notifications/NotificationsPage";
 
 export const router = createBrowserRouter([
   {
     path: "/",
     element: <LoginPage />,
+  },
+  {
+    path: "/change-password",
+    element: <ChangePasswordPage />,
   },
   {
     path: "/dashboard",
@@ -40,14 +46,7 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
-  {
-    path: "/payroll",
-    element: (
-      <ProtectedRoute>
-        <PayrollPage />
-      </ProtectedRoute>
-    ),
-  },
+  
   {
     path: "/profile",
     element: (
@@ -74,14 +73,13 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
   },
+ 
   {
-    path: "/employees",
-    element: (
-      <ProtectedRoute>
-        <AdminRoute>
-          <EmployeesPage />
-        </AdminRoute>
-      </ProtectedRoute>
-    ),
-  },
+  path: "/notifications",
+  element: (
+    <ProtectedRoute>
+      <NotificationsPage />
+    </ProtectedRoute>
+  ),
+},
 ]);

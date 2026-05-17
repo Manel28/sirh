@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Leave;
+use App\Entity\Notification;
 use App\Repository\LeaveRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -50,6 +51,8 @@ class LeaveController
                     'user' => [
                         'id' => $leave->getUser()?->getId(),
                         'email' => $leave->getUser()?->getEmail(),
+                        'firstName' => $leave->getUser()?->getFirstName(),
+                        'lastName' => $leave->getUser()?->getLastName(),
                     ],
                 ];
             }, $leaves);
@@ -97,6 +100,30 @@ class LeaveController
             $leave->setUser($user);
 
             $entityManager->persist($leave);
+
+            $admins = array_filter($userRepository->findAll(), function ($admin) {
+                return in_array('ROLE_ADMIN', $admin->getRoles(), true);
+            });
+
+            foreach ($admins as $admin) {
+                $notification = new Notification();
+                $notification->setUser($admin);
+                $notification->setTitle('New leave request');
+                $notification->setMessage(
+                    $user->getEmail() .
+                    ' submitted a leave request from ' .
+                    $data['start'] .
+                    ' to ' .
+                    $data['end'] .
+                    '.'
+                );
+                $notification->setType('leave');
+                $notification->setIsRead(false);
+                $notification->setCreatedAt(new \DateTime());
+
+                $entityManager->persist($notification);
+            }
+
             $entityManager->flush();
 
             return new JsonResponse([
@@ -110,6 +137,8 @@ class LeaveController
                     'user' => [
                         'id' => $leave->getUser()?->getId(),
                         'email' => $leave->getUser()?->getEmail(),
+                        'firstName' => $leave->getUser()?->getFirstName(),
+                        'lastName' => $leave->getUser()?->getLastName(),
                     ],
                 ]
             ], 201);
@@ -127,7 +156,8 @@ class LeaveController
         int $id,
         Request $request,
         LeaveRepository $leaveRepository,
-        EntityManagerInterface $entityManager
+        EntityManagerInterface $entityManager,
+        UserRepository $userRepository
     ): JsonResponse {
         try {
             $leave = $leaveRepository->find($id);
@@ -149,6 +179,50 @@ class LeaveController
             }
 
             $leave->setStatus($data['status']);
+
+            $targetUser = $leave->getUser();
+
+            if ($targetUser) {
+                $notification = new Notification();
+                $notification->setUser($targetUser);
+                $notification->setTitle('Leave request ' . strtolower($data['status']));
+                $notification->setMessage(
+                    'Your leave request from ' .
+                    $leave->getStartDate()?->format('Y-m-d') .
+                    ' to ' .
+                    $leave->getEndDate()?->format('Y-m-d') .
+                    ' is now ' .
+                    $data['status'] .
+                    '.'
+                );
+                $notification->setType('leave');
+                $notification->setIsRead(false);
+                $notification->setCreatedAt(new \DateTime());
+
+                $entityManager->persist($notification);
+            }
+
+            if ($data['status'] === 'Cancelled') {
+                $admins = array_filter($userRepository->findAll(), function ($admin) {
+                    return in_array('ROLE_ADMIN', $admin->getRoles(), true);
+                });
+
+                foreach ($admins as $admin) {
+                    $notification = new Notification();
+                    $notification->setUser($admin);
+                    $notification->setTitle('Leave request cancelled');
+                    $notification->setMessage(
+                        ($targetUser?->getEmail() ?: 'A collaborator') .
+                        ' cancelled a leave request.'
+                    );
+                    $notification->setType('leave');
+                    $notification->setIsRead(false);
+                    $notification->setCreatedAt(new \DateTime());
+
+                    $entityManager->persist($notification);
+                }
+            }
+
             $entityManager->flush();
 
             return new JsonResponse([
@@ -162,6 +236,8 @@ class LeaveController
                     'user' => [
                         'id' => $leave->getUser()?->getId(),
                         'email' => $leave->getUser()?->getEmail(),
+                        'firstName' => $leave->getUser()?->getFirstName(),
+                        'lastName' => $leave->getUser()?->getLastName(),
                     ],
                 ]
             ], 200);
