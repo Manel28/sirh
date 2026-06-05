@@ -62,6 +62,7 @@ export default function LeavesPage() {
   const [showModal, setShowModal] = useState(false);
   const [error, setError] = useState("");
   const [leaves, setLeaves] = useState([]);
+  const [leaveBalance, setLeaveBalance] = useState(25);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
 
@@ -90,8 +91,11 @@ export default function LeavesPage() {
     try {
       setLoading(true);
       setError("");
+
       const data = await getLeaves();
-      setLeaves(Array.isArray(data) ? data : []);
+
+      setLeaves(Array.isArray(data) ? data : data.leaves || []);
+      setLeaveBalance(data.leaveBalance ?? 25);
     } catch (err) {
       console.error(err);
       setError("Failed to load leave requests.");
@@ -106,6 +110,7 @@ export default function LeavesPage() {
       start: "",
       end: "",
     });
+
     setError("");
   };
 
@@ -119,8 +124,14 @@ export default function LeavesPage() {
       return "Please fill in all required fields.";
     }
 
-    if (form.start < today) return "Start date cannot be in the past.";
-    if (form.end < today) return "End date cannot be in the past.";
+    if (form.start < today) {
+      return "Start date cannot be in the past.";
+    }
+
+    if (form.end < today) {
+      return "End date cannot be in the past.";
+    }
+
     if (form.end < form.start) {
       return "End date cannot be earlier than start date.";
     }
@@ -140,16 +151,21 @@ export default function LeavesPage() {
       setSubmitting(true);
       setError("");
 
-      await createLeave({
+      const response = await createLeave({
         type: form.type,
         start: form.start,
         end: form.end,
       });
 
+      if (response?.leaveBalance !== undefined) {
+        setLeaveBalance(response.leaveBalance);
+      }
+
       await fetchLeaves();
       closeModal();
     } catch (err) {
       console.error(err);
+
       setError(
         err?.response?.data?.message ||
           err?.response?.data?.error ||
@@ -169,7 +185,12 @@ export default function LeavesPage() {
       await fetchLeaves();
     } catch (err) {
       console.error(err);
-      setError("Failed to cancel leave request.");
+
+      setError(
+        err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          "Failed to cancel leave request."
+      );
     } finally {
       setSubmitting(false);
     }
@@ -179,11 +200,21 @@ export default function LeavesPage() {
     try {
       setError("");
 
-      await updateLeaveStatus(leaveId, status);
+      const response = await updateLeaveStatus(leaveId, status);
+
+      if (response?.leaveBalance !== undefined) {
+        setLeaveBalance(response.leaveBalance);
+      }
+
       await fetchLeaves();
     } catch (err) {
       console.error(err);
-      setError("Failed to update leave status.");
+
+      setError(
+        err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          "Failed to update leave status."
+      );
     }
   };
 
@@ -204,22 +235,20 @@ export default function LeavesPage() {
 
                 <p className="mt-3 max-w-2xl text-white/85">
                   {isAdmin
-                    ? "View, approve or reject employees leave requests."
+                    ? "View employee leave requests and create your own leave request."
                     : "Create and follow your own leave requests."}
                 </p>
               </div>
 
-              {!isAdmin && (
-                <button
-                  onClick={() => {
-                    setError("");
-                    setShowModal(true);
-                  }}
-                  className="rounded-2xl bg-white px-5 py-3 font-bold text-[#12396b] shadow-lg transition hover:bg-blue-50"
-                >
-                  New Leave Request
-                </button>
-              )}
+              <button
+                onClick={() => {
+                  setError("");
+                  setShowModal(true);
+                }}
+                className="rounded-2xl bg-white px-5 py-3 font-bold text-[#12396b] shadow-lg transition hover:bg-blue-50"
+              >
+                New Leave Request
+              </button>
             </div>
           </div>
         </section>
@@ -230,22 +259,31 @@ export default function LeavesPage() {
           </div>
         )}
 
-        <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
+        <section className="grid grid-cols-1 gap-4 md:grid-cols-5">
+          <StatusCard
+            label="Remaining Leave"
+            value={`${leaveBalance} day(s)`}
+            className="bg-gradient-to-br from-blue-50 to-sky-100 text-blue-700 border-blue-200"
+          />
+
           <StatusCard
             label="Pending"
             value={stats.pending}
             className="bg-gradient-to-br from-amber-50 to-orange-100 text-orange-700 border-orange-200"
           />
+
           <StatusCard
             label="Approved"
             value={stats.approved}
             className="bg-gradient-to-br from-emerald-50 to-green-100 text-emerald-700 border-emerald-200"
           />
+
           <StatusCard
             label="Rejected"
             value={stats.rejected}
             className="bg-gradient-to-br from-rose-50 to-red-100 text-rose-700 border-rose-200"
           />
+
           <StatusCard
             label="Cancelled"
             value={stats.cancelled}
@@ -258,23 +296,28 @@ export default function LeavesPage() {
             <h2 className="text-xl font-bold text-slate-900">
               {isAdmin ? "All Leave Requests" : "Request History"}
             </h2>
+
             <p className="mt-1 text-sm text-slate-500">
               {isAdmin
-                ? "Review and manage all employee requests."
-                : "Track the status of your submitted requests."}
+                ? "Review employee requests and check their remaining balance."
+                : "Track your leave requests and remaining balance."}
             </p>
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[850px] text-left">
+            <table className="w-full min-w-[950px] text-left">
               <thead className="bg-gradient-to-r from-[#12396b] to-blue-600 text-white">
                 <tr>
                   {isAdmin && (
                     <th className="p-4 text-sm font-semibold">Employee</th>
                   )}
+
                   <th className="p-4 text-sm font-semibold">Leave Type</th>
                   <th className="p-4 text-sm font-semibold">Period</th>
                   <th className="p-4 text-sm font-semibold">Duration</th>
+                  <th className="p-4 text-sm font-semibold">
+                    Leave Balance
+                  </th>
                   <th className="p-4 text-sm font-semibold">Status</th>
                   <th className="p-4 text-sm font-semibold">Actions</th>
                 </tr>
@@ -284,89 +327,118 @@ export default function LeavesPage() {
                 {loading ? (
                   <tr>
                     <td
-                      colSpan={isAdmin ? 6 : 5}
+                      colSpan={isAdmin ? 7 : 6}
                       className="p-8 text-center font-semibold text-slate-500"
                     >
                       Loading leave requests...
                     </td>
                   </tr>
                 ) : leaves.length > 0 ? (
-                  leaves.map((leave) => (
-                    <tr
-                      key={leave.id}
-                      className="border-t border-slate-200 transition hover:bg-blue-50/40"
-                    >
-                      {isAdmin && (
-                        <td className="p-4 font-semibold text-slate-800">
-                          {leave.user?.firstName || leave.user?.lastName
-                            ? `${leave.user?.firstName || ""} ${
-                                leave.user?.lastName || ""
-                              }`
-                            : leave.user?.email || "Unknown"}
+                  leaves.map((leave) => {
+                    const isOwnLeave = leave.user?.id === user?.id;
+                    const isPending = leave.status === "Pending";
+                    const rowBalance = isOwnLeave
+                      ? leaveBalance
+                      : leave.user?.leaveBalance ?? 25;
+
+                    return (
+                      <tr
+                        key={leave.id}
+                        className="border-t border-slate-200 transition hover:bg-blue-50/40"
+                      >
+                       {isAdmin && (
+  <td className="p-4 font-semibold text-slate-800">
+    <div>
+      {leave.user?.firstName || leave.user?.lastName
+        ? `${leave.user?.firstName || ""} ${
+            leave.user?.lastName || ""
+          }`
+        : leave.user?.email || "Unknown"}
+
+      {isOwnLeave && (
+        <span className="ml-2 rounded-full bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">
+          Me
+        </span>
+      )}
+    </div>
+
+    <div className="mt-1 text-xs font-bold text-blue-700">
+      Remaining leave: {leave.user?.leaveBalance ?? 25} day(s)
+    </div>
+  </td>
+)}
+                        <td className="p-4">{leave.type}</td>
+
+                        <td className="p-4">
+                          {formatPeriod(leave.start, leave.end)}
                         </td>
-                      )}
 
-                      <td className="p-4">{leave.type}</td>
+                        <td className="p-4">
+                          {countWorkingDays(leave.start, leave.end)} day(s)
+                        </td>
 
-                      <td className="p-4">
-                        {formatPeriod(leave.start, leave.end)}
-                      </td>
+                        <td className="p-4 font-bold text-blue-700">
+                          {rowBalance} day(s)
+                        </td>
 
-                      <td className="p-4">
-                        {countWorkingDays(leave.start, leave.end)} day(s)
-                      </td>
-
-                      <td className="p-4">
-                        <span
-                          className={`inline-flex rounded-full border px-3 py-1 text-sm font-semibold ${getStatusBadgeClass(
-                            leave.status
-                          )}`}
-                        >
-                          {getStatusLabel(leave.status)}
-                        </span>
-                      </td>
-
-                      <td className="p-4">
-                        {isAdmin && leave.status === "Pending" ? (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() =>
-                                handleAdminStatusUpdate(leave.id, "Approved")
-                              }
-                              className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
-                            >
-                              Approve
-                            </button>
-
-                            <button
-                              onClick={() =>
-                                handleAdminStatusUpdate(leave.id, "Rejected")
-                              }
-                              className="rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-rose-700"
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        ) : !isAdmin && leave.status === "Pending" ? (
-                          <button
-                            onClick={() => handleCancelRequest(leave.id)}
-                            disabled={submitting}
-                            className="rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:opacity-50"
+                        <td className="p-4">
+                          <span
+                            className={`inline-flex rounded-full border px-3 py-1 text-sm font-semibold ${getStatusBadgeClass(
+                              leave.status
+                            )}`}
                           >
-                            Cancel Request
-                          </button>
-                        ) : (
-                          <span className="text-sm text-slate-400">
-                            No action
+                            {getStatusLabel(leave.status)}
                           </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+
+                        <td className="p-4">
+                          {isAdmin && isPending && !isOwnLeave ? (
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() =>
+                                  handleAdminStatusUpdate(
+                                    leave.id,
+                                    "Approved"
+                                  )
+                                }
+                                className="rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+                              >
+                                Approve
+                              </button>
+
+                              <button
+                                onClick={() =>
+                                  handleAdminStatusUpdate(
+                                    leave.id,
+                                    "Rejected"
+                                  )
+                                }
+                                className="rounded-lg bg-rose-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-rose-700"
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          ) : isOwnLeave && isPending ? (
+                            <button
+                              onClick={() => handleCancelRequest(leave.id)}
+                              disabled={submitting}
+                              className="rounded-lg bg-orange-500 px-3 py-2 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:opacity-50"
+                            >
+                              Cancel Request
+                            </button>
+                          ) : (
+                            <span className="text-sm text-slate-400">
+                              No action
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
                 ) : (
                   <tr>
                     <td
-                      colSpan={isAdmin ? 6 : 5}
+                      colSpan={isAdmin ? 7 : 6}
                       className="p-8 text-center text-slate-500"
                     >
                       No leave requests found.
@@ -400,15 +472,23 @@ export default function LeavesPage() {
                 </div>
               )}
 
+              <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
+                Remaining leave balance: {leaveBalance} day(s)
+              </div>
+
               <div className="space-y-4">
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Leave Type *
                   </label>
+
                   <select
                     value={form.type}
                     onChange={(e) =>
-                      setForm({ ...form, type: e.target.value })
+                      setForm({
+                        ...form,
+                        type: e.target.value,
+                      })
                     }
                     className="w-full rounded-lg border border-slate-300 px-3 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                   >
@@ -433,12 +513,16 @@ export default function LeavesPage() {
                     <label className="mb-2 block text-sm font-medium text-slate-700">
                       Start Date *
                     </label>
+
                     <input
                       type="date"
                       min={today}
                       value={form.start}
                       onChange={(e) =>
-                        setForm({ ...form, start: e.target.value })
+                        setForm({
+                          ...form,
+                          start: e.target.value,
+                        })
                       }
                       className="w-full rounded-lg border border-slate-300 px-3 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                     />
@@ -448,17 +532,28 @@ export default function LeavesPage() {
                     <label className="mb-2 block text-sm font-medium text-slate-700">
                       End Date *
                     </label>
+
                     <input
                       type="date"
                       min={form.start || today}
                       value={form.end}
                       onChange={(e) =>
-                        setForm({ ...form, end: e.target.value })
+                        setForm({
+                          ...form,
+                          end: e.target.value,
+                        })
                       }
                       className="w-full rounded-lg border border-slate-300 px-3 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
                     />
                   </div>
                 </div>
+
+                {form.start && form.end && (
+                  <div className="rounded-xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm font-semibold text-orange-700">
+                    Requested duration:{" "}
+                    {countWorkingDays(form.start, form.end)} day(s)
+                  </div>
+                )}
               </div>
 
               <div className="mt-6 flex justify-end gap-3">

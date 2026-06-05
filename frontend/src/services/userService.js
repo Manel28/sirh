@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:8001/api";
+const API_BASE_URL = "http://127.0.0.1:8001/api";
 
 export const getCollaborators = async () => {
   const response = await axios.get(`${API_BASE_URL}/admin/users`);
@@ -9,6 +9,11 @@ export const getCollaborators = async () => {
 
 export const createCollaborator = async (payload) => {
   const response = await axios.post(`${API_BASE_URL}/admin/users`, payload);
+  return response.data;
+};
+
+export const updateCollaborator = async (userId, payload) => {
+  const response = await axios.put(`${API_BASE_URL}/admin/users/${userId}`, payload);
   return response.data;
 };
 

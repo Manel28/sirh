@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:8001/api";
+const API_BASE_URL = "http://127.0.0.1:8001/api";
 
 const getStoredUser = () => {
   const user = localStorage.getItem("user");
@@ -25,5 +25,19 @@ export const getDocuments = async () => {
 
 export const uploadDocument = async (formData) => {
   const response = await axios.post(`${API_BASE_URL}/documents`, formData);
+  return response.data;
+};
+
+export const updateDocument = async (documentId, payload) => {
+  const response = await axios.put(
+    `${API_BASE_URL}/documents/${documentId}`,
+    payload
+  );
+
+  return response.data;
+};
+
+export const deleteDocument = async (documentId) => {
+  const response = await axios.delete(`${API_BASE_URL}/documents/${documentId}`);
   return response.data;
 };

@@ -3,12 +3,10 @@
 namespace App\Repository;
 
 use App\Entity\Leave;
+use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
-/**
- * @extends ServiceEntityRepository<Leave>
- */
 class LeaveRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -16,28 +14,24 @@ class LeaveRepository extends ServiceEntityRepository
         parent::__construct($registry, Leave::class);
     }
 
-//    /**
-//     * @return Leave[] Returns an array of Leave objects
-//     */
-//    public function findByExampleField($value): array
-//    {
-//        return $this->createQueryBuilder('l')
-//            ->andWhere('l.exampleField = :val')
-//            ->setParameter('val', $value)
-//            ->orderBy('l.id', 'ASC')
-//            ->setMaxResults(10)
-//            ->getQuery()
-//            ->getResult()
-//        ;
-//    }
+    public function hasOverlappingLeave(
+        User $user,
+        \DateTimeInterface $startDate,
+        \DateTimeInterface $endDate
+    ): bool {
+        $count = $this->createQueryBuilder('l')
+            ->select('COUNT(l.id)')
+            ->where('l.user = :user')
+            ->andWhere('l.status IN (:statuses)')
+            ->andWhere('l.startDate <= :endDate')
+            ->andWhere('l.endDate >= :startDate')
+            ->setParameter('user', $user)
+            ->setParameter('statuses', ['Pending', 'Approved'])
+            ->setParameter('startDate', $startDate)
+            ->setParameter('endDate', $endDate)
+            ->getQuery()
+            ->getSingleScalarResult();
 
-//    public function findOneBySomeField($value): ?Leave
-//    {
-//        return $this->createQueryBuilder('l')
-//            ->andWhere('l.exampleField = :val')
-//            ->setParameter('val', $value)
-//            ->getQuery()
-//            ->getOneOrNullResult()
-//        ;
-//    }
+        return $count > 0;
+    }
 }

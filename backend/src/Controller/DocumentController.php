@@ -3,19 +3,19 @@
 namespace App\Controller;
 
 use App\Entity\Document;
-use App\Entity\Notification;
 use App\Repository\DocumentRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\File\UploadedFile;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 
-class DocumentController
+class DocumentController extends AbstractController
 {
     #[Route('/api/documents', methods: ['GET'])]
-    public function listDocuments(
+    public function list(
         Request $request,
         DocumentRepository $documentRepository,
         UserRepository $userRepository
@@ -35,29 +35,26 @@ class DocumentController
 
             $isAdmin = in_array('ROLE_ADMIN', $user->getRoles(), true);
 
-            if ($isAdmin) {
-                $documents = $documentRepository->findBy([], ['createdAt' => 'DESC']);
-            } else {
-                $documents = $documentRepository->findBy(
-                    ['user' => $user],
-                    ['createdAt' => 'DESC']
-                );
-            }
+            $documents = $isAdmin
+                ? $documentRepository->findBy([], ['createdAt' => 'DESC'])
+                : $documentRepository->findBy(['user' => $user], ['createdAt' => 'DESC']);
 
-            $data = array_map(function (Document $document) use ($request) {
+            $data = array_map(function (Document $document) {
+                $owner = $document->getUser();
+
                 return [
                     'id' => $document->getId(),
                     'title' => $document->getTitle(),
                     'category' => $document->getCategory(),
-                    'filePath' => $request->getSchemeAndHttpHost() . $document->getFilePath(),
+                    'filePath' => $document->getFilePath(),
                     'fileType' => $document->getFileType(),
                     'fileSize' => $document->getFileSize(),
-                    'createdAt' => $document->getCreatedAt()?->format('Y-m-d'),
+                    'createdAt' => $document->getCreatedAt()?->format('Y-m-d H:i'),
                     'user' => [
-                        'id' => $document->getUser()?->getId(),
-                        'firstName' => $document->getUser()?->getFirstName(),
-                        'lastName' => $document->getUser()?->getLastName(),
-                        'email' => $document->getUser()?->getEmail(),
+                        'id' => $owner?->getId(),
+                        'firstName' => $owner?->getFirstName(),
+                        'lastName' => $owner?->getLastName(),
+                        'email' => $owner?->getEmail(),
                     ],
                 ];
             }, $documents);
@@ -65,27 +62,28 @@ class DocumentController
             return new JsonResponse($data);
         } catch (\Throwable $e) {
             return new JsonResponse([
+                'message' => 'Server error while loading documents',
                 'error' => $e->getMessage(),
             ], 500);
         }
     }
 
     #[Route('/api/documents', methods: ['POST'])]
-    public function uploadDocument(
+    public function upload(
         Request $request,
-        EntityManagerInterface $entityManager,
-        UserRepository $userRepository
+        UserRepository $userRepository,
+        EntityManagerInterface $entityManager
     ): JsonResponse {
         try {
-            $title = trim((string) $request->request->get('title', ''));
-            $category = trim((string) $request->request->get('category', ''));
+            $title = $request->request->get('title');
+            $category = $request->request->get('category');
             $userId = $request->request->get('userId');
 
             /** @var UploadedFile|null $file */
             $file = $request->files->get('file');
 
-            if ($title === '' || $category === '' || !$userId || !$file) {
-                return new JsonResponse(['message' => 'Missing required data'], 400);
+            if (!$title || !$category || !$userId || !$file) {
+                return new JsonResponse(['message' => 'Missing required fields'], 400);
             }
 
             $user = $userRepository->find($userId);
@@ -94,80 +92,130 @@ class DocumentController
                 return new JsonResponse(['message' => 'User not found'], 404);
             }
 
-            $extension = strtolower((string) $file->getClientOriginalExtension());
+            $extension = strtolower($file->getClientOriginalExtension());
 
             if ($extension !== 'pdf') {
                 return new JsonResponse(['message' => 'Only PDF files are allowed'], 400);
             }
 
-            $rawSize = (int) ($file->getSize() ?? 0);
-
-            if ($rawSize <= 0) {
-                return new JsonResponse(['message' => 'Unable to read uploaded file size'], 400);
-            }
-
-            if ($rawSize > 10 * 1024 * 1024) {
-                return new JsonResponse(['message' => 'File must be less than 10 MB'], 400);
-            }
-
-            $uploadDir = dirname(__DIR__, 2) . '/public/uploads/documents';
+            $uploadDir = $this->getParameter('kernel.project_dir') . '/public/uploads/documents';
 
             if (!is_dir($uploadDir)) {
-                return new JsonResponse([
-                    'message' => 'Documents folder is missing. Please create backend/public/uploads/documents manually.'
-                ], 500);
+                mkdir($uploadDir, 0777, true);
             }
 
-            $originalName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-            $safeName = preg_replace('/[^A-Za-z0-9_-]/', '-', $originalName);
-            $safeName = trim((string) $safeName, '-');
-            $safeName = $safeName !== '' ? $safeName : 'document';
+            $fileName = uniqid('document_', true) . '.pdf';
 
-            $newFilename = $safeName . '-' . uniqid('', true) . '.pdf';
-
-            $file->move($uploadDir, $newFilename);
+            $file->move($uploadDir, $fileName);
 
             $document = new Document();
             $document->setTitle($title);
             $document->setCategory($category);
-            $document->setFilePath('/uploads/documents/' . $newFilename);
-            $document->setFileType('PDF');
-            $document->setFileSize($this->formatBytes($rawSize));
+            $document->setFilePath('/uploads/documents/' . $fileName);
+            $document->setFileType('application/pdf');
+            $document->setFileSize('PDF');
             $document->setCreatedAt(new \DateTime());
             $document->setUser($user);
 
             $entityManager->persist($document);
-
-            $notification = new Notification();
-            $notification->setUser($user);
-            $notification->setTitle('New document available');
-            $notification->setMessage(
-                'A new ' . $category . ' document has been added to your account: ' . $title . '.'
-            );
-            $notification->setType('document');
-            $notification->setIsRead(false);
-            $notification->setCreatedAt(new \DateTime());
-
-            $entityManager->persist($notification);
-
             $entityManager->flush();
 
             return new JsonResponse([
-                'message' => 'Document uploaded successfully'
+                'message' => 'Document uploaded successfully',
+                'id' => $document->getId(),
             ], 201);
         } catch (\Throwable $e) {
             return new JsonResponse([
+                'message' => 'Server error while uploading document',
                 'error' => $e->getMessage(),
             ], 500);
         }
     }
 
-    private function formatBytes(int $bytes): string
-    {
-        if ($bytes >= 1024 * 1024) {
-            return round($bytes / (1024 * 1024), 1) . ' MB';
-        }
+    #[Route('/api/documents/{id}', methods: ['PUT'])]
+    public function update(
+        int $id,
+        Request $request,
+        DocumentRepository $documentRepository,
+        UserRepository $userRepository,
+        EntityManagerInterface $entityManager
+    ): JsonResponse {
+        try {
+            $document = $documentRepository->find($id);
 
-        return round($bytes / 1024) . ' KB';
+            if (!$document) {
+                return new JsonResponse(['message' => 'Document not found'], 404);
+            }
+
+            $data = json_decode($request->getContent(), true);
+
+            if (!$data) {
+                return new JsonResponse(['message' => 'Invalid data'], 400);
+            }
+
+            if (
+                empty($data['title']) ||
+                empty($data['category']) ||
+                empty($data['userId'])
+            ) {
+                return new JsonResponse(['message' => 'Missing required fields'], 400);
+            }
+
+            $user = $userRepository->find($data['userId']);
+
+            if (!$user) {
+                return new JsonResponse(['message' => 'User not found'], 404);
+            }
+
+            $document->setTitle(trim($data['title']));
+            $document->setCategory(trim($data['category']));
+            $document->setUser($user);
+
+            $entityManager->flush();
+
+            return new JsonResponse([
+                'message' => 'Document updated successfully',
+            ]);
+        } catch (\Throwable $e) {
+            return new JsonResponse([
+                'message' => 'Server error while updating document',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    #[Route('/api/documents/{id}', methods: ['DELETE'])]
+    public function delete(
+        int $id,
+        DocumentRepository $documentRepository,
+        EntityManagerInterface $entityManager
+    ): JsonResponse {
+        try {
+            $document = $documentRepository->find($id);
+
+            if (!$document) {
+                return new JsonResponse(['message' => 'Document not found'], 404);
+            }
+
+            $filePath = $this->getParameter('kernel.project_dir') .
+                '/public' .
+                $document->getFilePath();
+
+            if (file_exists($filePath)) {
+                unlink($filePath);
+            }
+
+            $entityManager->remove($document);
+            $entityManager->flush();
+
+            return new JsonResponse([
+                'message' => 'Document deleted successfully',
+            ]);
+        } catch (\Throwable $e) {
+            return new JsonResponse([
+                'message' => 'Server error while deleting document',
+                'error' => $e->getMessage(),
+            ], 500);
+        }
     }
 }

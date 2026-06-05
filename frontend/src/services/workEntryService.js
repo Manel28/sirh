@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:8001/api";
+const API_BASE_URL = "http://127.0.0.1:8001/api";
 
 export const getWorkEntriesByMonth = async (month, userId = null) => {
   const response = await axios.get(`${API_BASE_URL}/work-entries`, {

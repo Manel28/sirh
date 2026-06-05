@@ -4,6 +4,7 @@ import {
   createCollaborator,
   deleteCollaborator,
   getCollaborators,
+  updateCollaborator,
 } from "../../services/userService";
 
 export default function CollaboratorsPage() {
@@ -14,6 +15,7 @@ export default function CollaboratorsPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [editingUser, setEditingUser] = useState(null);
 
   const [form, setForm] = useState({
     firstName: "",
@@ -116,6 +118,41 @@ export default function CollaboratorsPage() {
     }
   };
 
+  const handleEdit = async (e) => {
+    e.preventDefault();
+
+    try {
+      setSubmitting(true);
+      setMessage("");
+      setError("");
+
+      const response = await updateCollaborator(editingUser.id, {
+        firstName: editingUser.firstName,
+        lastName: editingUser.lastName,
+        email: editingUser.email,
+        jobTitle: editingUser.jobTitle,
+        department: editingUser.department,
+        photo: editingUser.photo,
+        isAdmin:
+          editingUser.isAdmin === true ||
+          editingUser.roles?.includes("ROLE_ADMIN"),
+      });
+
+      setMessage(response.message || "Collaborator updated successfully.");
+      setEditingUser(null);
+      await fetchCollaborators();
+    } catch (err) {
+      console.error(err);
+      setError(
+        err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          "Failed to update collaborator."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleDelete = async (userId) => {
     const confirmDelete = window.confirm(
       "Are you sure you want to delete this collaborator?"
@@ -153,8 +190,8 @@ export default function CollaboratorsPage() {
               Collaborators Management
             </h1>
             <p className="mt-2 max-w-2xl text-white/85">
-              Create collaborator accounts, send credentials automatically, and
-              manage HR access from one place.
+              Create, update, delete and manage collaborator accounts from one
+              place.
             </p>
           </div>
         </section>
@@ -278,7 +315,7 @@ export default function CollaboratorsPage() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[950px] text-left">
+                <table className="w-full min-w-[1000px] text-left">
                   <thead className="bg-gradient-to-r from-[#12396b] to-blue-600 text-white">
                     <tr>
                       <th className="p-4 text-sm font-semibold">Photo</th>
@@ -288,7 +325,7 @@ export default function CollaboratorsPage() {
                       <th className="p-4 text-sm font-semibold">Role</th>
                       <th className="p-4 text-sm font-semibold">Job Title</th>
                       <th className="p-4 text-sm font-semibold">Department</th>
-                      <th className="p-4 text-sm font-semibold">Action</th>
+                      <th className="p-4 text-sm font-semibold">Actions</th>
                     </tr>
                   </thead>
 
@@ -321,10 +358,13 @@ export default function CollaboratorsPage() {
                             <td className="p-4 font-semibold text-slate-800">
                               {item.firstName || "-"}
                             </td>
+
                             <td className="p-4">{item.lastName || "-"}</td>
+
                             <td className="p-4 text-slate-600">
                               {item.email}
                             </td>
+
                             <td className="p-4">
                               <span
                                 className={`rounded-full px-3 py-1 text-xs font-bold ${
@@ -336,25 +376,42 @@ export default function CollaboratorsPage() {
                                 {isAdmin ? "Admin / HR" : "Collaborator"}
                               </span>
                             </td>
+
                             <td className="p-4">{item.jobTitle || "-"}</td>
+
                             <td className="p-4">{item.department || "-"}</td>
 
                             <td className="p-4">
-                              {!isAdmin ? (
+                              <div className="flex items-center gap-2">
                                 <button
-                                  onClick={() => handleDelete(item.id)}
-                                  disabled={deletingId === item.id}
-                                  className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:opacity-50"
+                                  onClick={() =>
+                                    setEditingUser({
+                                      ...item,
+                                      isAdmin:
+                                        item.roles?.includes("ROLE_ADMIN"),
+                                    })
+                                  }
+                                  className="rounded-xl bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-blue-700"
                                 >
-                                  {deletingId === item.id
-                                    ? "Deleting..."
-                                    : "Delete"}
+                                  Edit
                                 </button>
-                              ) : (
-                                <span className="text-sm font-semibold text-slate-400">
-                                  Protected
-                                </span>
-                              )}
+
+                                {!isAdmin ? (
+                                  <button
+                                    onClick={() => handleDelete(item.id)}
+                                    disabled={deletingId === item.id}
+                                    className="rounded-xl bg-rose-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:opacity-50"
+                                  >
+                                    {deletingId === item.id
+                                      ? "Deleting..."
+                                      : "Delete"}
+                                  </button>
+                                ) : (
+                                  <span className="text-sm font-semibold text-slate-400">
+                                    Protected
+                                  </span>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -376,6 +433,100 @@ export default function CollaboratorsPage() {
           </div>
         </div>
       </div>
+
+      {editingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <div className="w-full max-w-xl rounded-[28px] bg-white p-6 shadow-2xl">
+            <h2 className="mb-6 text-2xl font-bold text-slate-900">
+              Edit Collaborator
+            </h2>
+
+            <form onSubmit={handleEdit} className="space-y-4">
+              <FormInput
+                placeholder="First Name *"
+                value={editingUser.firstName || ""}
+                onChange={(value) =>
+                  setEditingUser({ ...editingUser, firstName: value })
+                }
+              />
+
+              <FormInput
+                placeholder="Last Name *"
+                value={editingUser.lastName || ""}
+                onChange={(value) =>
+                  setEditingUser({ ...editingUser, lastName: value })
+                }
+              />
+
+              <FormInput
+                type="email"
+                placeholder="Email *"
+                value={editingUser.email || ""}
+                onChange={(value) =>
+                  setEditingUser({ ...editingUser, email: value })
+                }
+              />
+
+              <FormInput
+                placeholder="Job Title *"
+                value={editingUser.jobTitle || ""}
+                onChange={(value) =>
+                  setEditingUser({ ...editingUser, jobTitle: value })
+                }
+              />
+
+              <FormInput
+                placeholder="Department *"
+                value={editingUser.department || ""}
+                onChange={(value) =>
+                  setEditingUser({ ...editingUser, department: value })
+                }
+              />
+
+              <FormInput
+                placeholder="Photo URL"
+                value={editingUser.photo || ""}
+                onChange={(value) =>
+                  setEditingUser({ ...editingUser, photo: value })
+                }
+              />
+
+              <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={editingUser.isAdmin}
+                  onChange={(e) =>
+                    setEditingUser({
+                      ...editingUser,
+                      isAdmin: e.target.checked,
+                    })
+                  }
+                  className="h-4 w-4 accent-[#12396b]"
+                />
+                HR / Admin
+              </label>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  className="rounded-2xl border border-slate-300 px-5 py-3 font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="rounded-2xl bg-gradient-to-r from-[#12396b] to-blue-600 px-5 py-3 font-bold text-white shadow-lg transition hover:opacity-90 disabled:opacity-50"
+                >
+                  {submitting ? "Saving..." : "Save Changes"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </AppLayout>
   );
 }

@@ -46,6 +46,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $photo = null;
 
+    #[ORM\Column]
+    private int $leaveBalance = 25;
+
     #[ORM\OneToMany(targetEntity: Leave::class, mappedBy: 'user')]
     private Collection $leaves;
 
@@ -149,6 +152,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
+    public function getLeaveBalance(): int
+    {
+        return $this->leaveBalance;
+    }
+
+    public function setLeaveBalance(int $leaveBalance): static
+    {
+        $this->leaveBalance = $leaveBalance;
+        return $this;
+    }
+
     public function __serialize(): array
     {
         $data = (array) $this;
@@ -167,6 +181,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
             $this->leaves->add($leave);
             $leave->setUser($this);
         }
+
         return $this;
     }
 
@@ -184,6 +199,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
             $this->workEntries->add($workEntry);
             $workEntry->setUser($this);
         }
+
         return $this;
     }
 
@@ -194,6 +210,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
                 $workEntry->setUser(null);
             }
         }
+
         return $this;
     }
 

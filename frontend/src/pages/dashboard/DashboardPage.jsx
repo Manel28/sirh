@@ -140,7 +140,7 @@ export default function DashboardPage() {
                     src={
                       user.photo.startsWith("http")
                         ? user.photo
-                        : `http://localhost:8001/${user.photo}`
+                        : `http://127.0.0.1:8001/${user.photo}`
                     }
                     alt="Profile"
                     className="h-16 w-16 rounded-2xl border-2 border-white/40 object-cover"
@@ -290,7 +290,7 @@ export default function DashboardPage() {
                             src={
                               item.photo.startsWith("http")
                                 ? item.photo
-                                : `http://localhost:8001/${item.photo}`
+                                : `http://127.0.0.1:8001/${item.photo}`
                             }
                             alt="Profile"
                             className="h-11 w-11 rounded-2xl object-cover"

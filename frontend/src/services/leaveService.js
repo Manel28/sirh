@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_URL = "http://localhost:8001/api/leaves";
+const API_BASE_URL = "http://127.0.0.1:8001/api";
 
 const getStoredUser = () => {
   const user = localStorage.getItem("user");
@@ -10,38 +10,31 @@ const getStoredUser = () => {
 export const getLeaves = async () => {
   const user = getStoredUser();
 
-  if (!user) {
-    throw new Error("User not found in localStorage");
-  }
-
-  const response = await axios.get(API_URL, {
+  const response = await axios.get(`${API_BASE_URL}/leaves`, {
     params: {
-      userId: user.id,
-      roles: Array.isArray(user.roles) ? user.roles : [],
+      userId: user?.id,
+      roles: user?.roles || [],
     },
   });
 
   return response.data;
 };
 
-export const createLeave = async (data) => {
+export const createLeave = async (leaveData) => {
   const user = getStoredUser();
 
-  if (!user) {
-    throw new Error("User not found in localStorage");
-  }
+  const response = await axios.post(`${API_BASE_URL}/leaves`, {
+    type: leaveData.type,
+    start: leaveData.start,
+    end: leaveData.end,
+    userId: user?.id,
+  });
 
-  const payload = {
-    ...data,
-    userId: user.id,
-  };
-
-  const response = await axios.post(API_URL, payload);
   return response.data;
 };
 
 export const updateLeaveStatus = async (leaveId, status) => {
-  const response = await axios.patch(`${API_URL}/${leaveId}/status`, {
+  const response = await axios.patch(`${API_BASE_URL}/leaves/${leaveId}/status`, {
     status,
   });
 

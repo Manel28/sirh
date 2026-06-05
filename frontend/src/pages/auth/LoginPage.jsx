@@ -27,7 +27,7 @@ export default function LoginPage() {
       setLoading(true);
       setError("");
 
-      const response = await axios.post("http://localhost:8001/api/login", {
+      const response = await axios.post("http://127.0.0.1:8001/api/login", {
         email: form.email,
         password: form.password,
       });
@@ -65,7 +65,7 @@ export default function LoginPage() {
             </div>
 
             <h1 className="mt-8 text-5xl font-extrabold leading-tight">
-              Welcome back.
+              Welcome.
             </h1>
 
             <p className="mt-5 text-white/80 text-lg leading-8 max-w-md">

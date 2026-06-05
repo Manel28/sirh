@@ -44,9 +44,7 @@ class AdminUserController
         UserPasswordHasherInterface $passwordHasher,
         MailerInterface $mailer
     ): JsonResponse {
-
         try {
-
             $data = json_decode($request->getContent(), true);
 
             if (
@@ -57,47 +55,30 @@ class AdminUserController
                 empty($data['jobTitle']) ||
                 empty($data['department'])
             ) {
-                return new JsonResponse([
-                    'message' => 'Missing required fields'
-                ], 400);
+                return new JsonResponse(['message' => 'Missing required fields'], 400);
             }
 
             $email = strtolower(trim($data['email']));
 
             if ($userRepository->findOneBy(['email' => $email])) {
-
-                return new JsonResponse([
-                    'message' => 'A user with this email already exists'
-                ], 409);
+                return new JsonResponse(['message' => 'A user with this email already exists'], 409);
             }
 
             $temporaryPassword = $this->generateStrongPassword();
 
             $user = new User();
-
             $user->setFirstName(trim($data['firstName']));
             $user->setLastName(trim($data['lastName']));
             $user->setEmail($email);
             $user->setJobTitle(trim($data['jobTitle']));
             $user->setDepartment(trim($data['department']));
             $user->setPhoto($data['photo'] ?? null);
-
-            $user->setRoles(
-                !empty($data['isAdmin'])
-                    ? ['ROLE_ADMIN']
-                    : ['ROLE_USER']
-            );
-
-            $user->setPassword(
-                $passwordHasher->hashPassword($user, $temporaryPassword)
-            );
-
+            $user->setRoles(!empty($data['isAdmin']) ? ['ROLE_ADMIN'] : ['ROLE_USER']);
+            $user->setPassword($passwordHasher->hashPassword($user, $temporaryPassword));
             $user->setMustChangePassword(true);
 
             $entityManager->persist($user);
             $entityManager->flush();
-
-            $emailSent = false;
 
             $emailMessage = (new Email())
                 ->from('adminsirh@gmail.com')
@@ -105,67 +86,83 @@ class AdminUserController
                 ->subject('Your collaborator account has been created')
                 ->html("
                     <h2>Hello {$user->getFirstName()},</h2>
-
                     <p>Your collaborator account has been created successfully.</p>
-
-                    <p>
-                        <strong>Email:</strong> {$user->getEmail()}
-                    </p>
-
-                    <p>
-                        <strong>Temporary password:</strong> {$temporaryPassword}
-                    </p>
-
-                    <p>
-                        You must change your password after your first login.
-                    </p>
-
+                    <p><strong>Email:</strong> {$user->getEmail()}</p>
+                    <p><strong>Temporary password:</strong> {$temporaryPassword}</p>
+                    <p>You must change your password after your first login.</p>
                     <br>
-
-                    <p>
-                        HR Team
-                    </p>
+                    <p>HR Team</p>
                 ");
 
-            try {
-
-                $mailer->send($emailMessage);
-
-                $emailSent = true;
-
-            } catch (\Throwable $mailError) {
-
-                return new JsonResponse([
-                    'message' => 'Mail error',
-                    'error' => $mailError->getMessage()
-                ], 500);
-            }
+            $mailer->send($emailMessage);
 
             return new JsonResponse([
-
-                'message' => $emailSent
-                    ? 'Collaborator created successfully. An email has been sent.'
-                    : 'Collaborator created successfully, but the email could not be sent.',
-
-                'user' => [
-                    'id' => $user->getId(),
-                    'firstName' => $user->getFirstName(),
-                    'lastName' => $user->getLastName(),
-                    'email' => $user->getEmail(),
-                    'jobTitle' => $user->getJobTitle(),
-                    'department' => $user->getDepartment(),
-                    'photo' => $user->getPhoto(),
-                    'roles' => $user->getRoles(),
-                    'mustChangePassword' => $user->isMustChangePassword(),
-                ]
-
+                'message' => 'Collaborator created successfully. An email has been sent.',
             ], 201);
 
         } catch (\Throwable $e) {
-
             return new JsonResponse([
                 'message' => 'Server error',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    #[Route('/api/admin/users/{id}', name: 'api_admin_users_update', methods: ['PUT'])]
+    public function updateUser(
+        int $id,
+        Request $request,
+        UserRepository $userRepository,
+        EntityManagerInterface $entityManager
+    ): JsonResponse {
+        try {
+            $user = $userRepository->find($id);
+
+            if (!$user) {
+                return new JsonResponse(['message' => 'Collaborator not found'], 404);
+            }
+
+            $data = json_decode($request->getContent(), true);
+
+            if (!$data) {
+                return new JsonResponse(['message' => 'Invalid data'], 400);
+            }
+
+            if (
+                empty($data['firstName']) ||
+                empty($data['lastName']) ||
+                empty($data['email']) ||
+                empty($data['jobTitle']) ||
+                empty($data['department'])
+            ) {
+                return new JsonResponse(['message' => 'Missing required fields'], 400);
+            }
+
+            $email = strtolower(trim($data['email']));
+            $existingUser = $userRepository->findOneBy(['email' => $email]);
+
+            if ($existingUser && $existingUser->getId() !== $user->getId()) {
+                return new JsonResponse(['message' => 'A user with this email already exists'], 409);
+            }
+
+            $user->setFirstName(trim($data['firstName']));
+            $user->setLastName(trim($data['lastName']));
+            $user->setEmail($email);
+            $user->setJobTitle(trim($data['jobTitle']));
+            $user->setDepartment(trim($data['department']));
+            $user->setPhoto($data['photo'] ?? null);
+            $user->setRoles(!empty($data['isAdmin']) ? ['ROLE_ADMIN'] : ['ROLE_USER']);
+
+            $entityManager->flush();
+
+            return new JsonResponse([
+                'message' => 'Collaborator updated successfully.',
+            ]);
+
+        } catch (\Throwable $e) {
+            return new JsonResponse([
+                'message' => 'Server error while updating collaborator',
+                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -176,21 +173,14 @@ class AdminUserController
         UserRepository $userRepository,
         EntityManagerInterface $entityManager
     ): JsonResponse {
-
         $user = $userRepository->find($id);
 
         if (!$user) {
-
-            return new JsonResponse([
-                'message' => 'Collaborator not found'
-            ], 404);
+            return new JsonResponse(['message' => 'Collaborator not found'], 404);
         }
 
-        if (in_array('ROLE_ADMIN', $user->getRoles())) {
-
-            return new JsonResponse([
-                'message' => 'Cannot delete admin / HR account'
-            ], 403);
+        if (in_array('ROLE_ADMIN', $user->getRoles(), true)) {
+            return new JsonResponse(['message' => 'Cannot delete admin / HR account'], 403);
         }
 
         foreach ($user->getDocuments() as $document) {
@@ -206,11 +196,10 @@ class AdminUserController
         }
 
         $entityManager->remove($user);
-
         $entityManager->flush();
 
         return new JsonResponse([
-            'message' => 'Collaborator deleted successfully'
+            'message' => 'Collaborator deleted successfully',
         ]);
     }
 
@@ -231,7 +220,6 @@ class AdminUserController
         $all = $lowercase . $uppercase . $numbers . $symbols;
 
         for ($i = count($password); $i < $length; $i++) {
-
             $password[] = $all[random_int(0, strlen($all) - 1)];
         }
 

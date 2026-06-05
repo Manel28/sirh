@@ -49,7 +49,7 @@ export default function ChangePasswordPage() {
       setError("");
 
       const response = await axios.post(
-        "http://localhost:8001/api/change-password",
+        "http://127.0.0.1:8001/api/change-password",
         {
           userId: user.id,
           newPassword: form.newPassword,
