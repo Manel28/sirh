@@ -18,15 +18,38 @@ import {
 
 const CODE_OPTIONS = ["", "SS", "TT", "TR", "AB"];
 
+const MONTH_OPTIONS = [
+  { value: "01", label: "January" },
+  { value: "02", label: "February" },
+  { value: "03", label: "March" },
+  { value: "04", label: "April" },
+  { value: "05", label: "May" },
+  { value: "06", label: "June" },
+  { value: "07", label: "July" },
+  { value: "08", label: "August" },
+  { value: "09", label: "September" },
+  { value: "10", label: "October" },
+  { value: "11", label: "November" },
+  { value: "12", label: "December" },
+];
+
 export default function CalendarPage() {
   const user = JSON.parse(localStorage.getItem("user") || "null");
-  const isAdmin = user?.roles?.includes("ROLE_ADMIN");
   const currentUserId = user?.id;
 
   const now = new Date();
+  const currentYear = now.getFullYear();
+
   const [month, setMonth] = useState(
-    `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
+    `${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}`
   );
+
+  const yearOptions = Array.from(
+  { length: 1000 },
+  (_, index) => 2026 + index
+);
+  const selectedYear = month.split("-")[0];
+  const selectedMonth = month.split("-")[1];
 
   const [employees, setEmployees] = useState([]);
   const [entries, setEntries] = useState([]);
@@ -45,10 +68,7 @@ export default function CalendarPage() {
 
       return {
         label: d,
-        date: `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(
-          2,
-          "0"
-        )}`,
+        date: `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`,
         dayName: date.toLocaleDateString("en-US", { weekday: "short" }),
         isWeekend: date.getDay() === 0 || date.getDay() === 6,
       };
@@ -95,15 +115,13 @@ export default function CalendarPage() {
   }, [entries]);
 
   const currentUser = useMemo(() => {
-    return (
-      employees.find((employee) => employee.id === currentUserId) || {
-        id: user?.id,
-        firstName: user?.firstName,
-        lastName: user?.lastName,
-        email: user?.email,
-      }
-    );
-  }, [employees, currentUserId, user]);
+    return {
+      id: user?.id,
+      firstName: user?.firstName,
+      lastName: user?.lastName,
+      email: user?.email,
+    };
+  }, [user]);
 
   const filteredEmployees = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -153,6 +171,14 @@ export default function CalendarPage() {
     };
   }, [filteredEmployees, entriesMap]);
 
+  const handleMonthChange = (newMonth) => {
+    setMonth(`${selectedYear}-${newMonth}`);
+  };
+
+  const handleYearChange = (newYear) => {
+    setMonth(`${newYear}-${selectedMonth}`);
+  };
+
   const handleChange = async (userId, date, code) => {
     try {
       const key = `${userId}_${date}`;
@@ -201,12 +227,32 @@ export default function CalendarPage() {
                 <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-white/70">
                   Selected month
                 </label>
-                <input
-                  type="month"
-                  value={month}
-                  onChange={(e) => setMonth(e.target.value)}
-                  className="w-full rounded-2xl border border-white/20 bg-white px-4 py-3 text-sm font-bold text-slate-800 outline-none focus:ring-4 focus:ring-white/20"
-                />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <select
+                    value={selectedMonth}
+                    onChange={(e) => handleMonthChange(e.target.value)}
+                    className="w-full rounded-2xl border border-white/20 bg-white px-4 py-3 text-sm font-bold text-slate-800 outline-none focus:ring-4 focus:ring-white/20"
+                  >
+                    {MONTH_OPTIONS.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => handleYearChange(e.target.value)}
+                    className="w-full rounded-2xl border border-white/20 bg-white px-4 py-3 text-sm font-bold text-slate-800 outline-none focus:ring-4 focus:ring-white/20"
+                  >
+                    {yearOptions.map((year) => (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -249,20 +295,18 @@ export default function CalendarPage() {
           </div>
         </section>
 
-        {!isAdmin && (
-          <CalendarTable
-            title="My Calendar"
-            subtitle="You can edit your own work days. Weekends and approved leave are locked."
-            days={days}
-            employees={[currentUser]}
-            entriesMap={entriesMap}
-            currentUserId={currentUserId}
-            isEditable={true}
-            saving={saving}
-            onChange={handleChange}
-            loading={loading}
-          />
-        )}
+        <CalendarTable
+          title="My Calendar"
+          subtitle="You can edit your own work days. Weekends and approved leave are locked."
+          days={days}
+          employees={[currentUser]}
+          entriesMap={entriesMap}
+          currentUserId={currentUserId}
+          isEditable={true}
+          saving={saving}
+          onChange={handleChange}
+          loading={loading}
+        />
 
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -385,9 +429,10 @@ function CalendarTable({
                     const key = `${employee.id}_${day.date}`;
                     const code = entriesMap[key] || (day.isWeekend ? "WK" : "");
                     const isSaving = saving === key;
+
                     const canEdit =
                       isEditable &&
-                      employee.id === currentUserId &&
+                      Number(employee.id) === Number(currentUserId) &&
                       !day.isWeekend &&
                       code !== "LV";
 

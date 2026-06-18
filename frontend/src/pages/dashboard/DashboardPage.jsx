@@ -39,7 +39,14 @@ export default function DashboardPage() {
         setLoadingStats(true);
 
         const leavesData = await getLeaves();
-        setLeaves(Array.isArray(leavesData) ? leavesData : []);
+
+setLeaves(
+  Array.isArray(leavesData)
+    ? leavesData
+    : Array.isArray(leavesData?.leaves)
+    ? leavesData.leaves
+    : []
+);
 
         if (isAdmin) {
           const usersData = await getCollaborators();

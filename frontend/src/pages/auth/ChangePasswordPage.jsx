@@ -1,16 +1,19 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
+import { Eye, EyeOff } from "lucide-react";
 
 export default function ChangePasswordPage() {
   const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem("user"));
+  const user = JSON.parse(localStorage.getItem("user") || "null");
 
   const [form, setForm] = useState({
     newPassword: "",
     confirmPassword: "",
   });
 
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -34,13 +37,13 @@ export default function ChangePasswordPage() {
 
     if (!strongPasswordRegex.test(form.newPassword)) {
       setError(
-        "Le mot de passe doit contenir au moins 8 caractères, une majuscule, une minuscule, un chiffre et un caractère spécial."
+        "Password must contain at least 8 characters, one uppercase letter, one lowercase letter, one number, and one special character."
       );
       return;
     }
 
     if (form.newPassword !== form.confirmPassword) {
-      setError("Les mots de passe ne correspondent pas.");
+      setError("Passwords do not match.");
       return;
     }
 
@@ -63,7 +66,7 @@ export default function ChangePasswordPage() {
       setError(
         err?.response?.data?.message ||
           err?.response?.data?.error ||
-          "Erreur lors du changement du mot de passe."
+          "Error while changing password."
       );
     } finally {
       setLoading(false);
@@ -78,12 +81,12 @@ export default function ChangePasswordPage() {
         </div>
 
         <h1 className="mt-6 text-3xl font-extrabold text-slate-900">
-          Changer le mot de passe
+          Change password
         </h1>
 
         <p className="mt-3 text-slate-500">
-          Votre mot de passe doit contenir au moins 8 caractères, une majuscule,
-          une minuscule, un chiffre et un caractère spécial.
+          Your password must contain at least 8 characters, one uppercase letter,
+          one lowercase letter, one number, and one special character.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-5">
@@ -95,30 +98,56 @@ export default function ChangePasswordPage() {
 
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Nouveau mot de passe
+              New password
             </label>
-            <input
-              type="password"
-              name="newPassword"
-              value={form.newPassword}
-              onChange={handleChange}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3.5 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-              required
-            />
+
+            <div className="relative">
+              <input
+                type={showNewPassword ? "text" : "password"}
+                name="newPassword"
+                value={form.newPassword}
+                onChange={handleChange}
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3.5 pr-12 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                required
+              />
+
+              <button
+                type="button"
+                onClick={() => setShowNewPassword((prev) => !prev)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-700"
+                aria-label={showNewPassword ? "Hide password" : "Show password"}
+              >
+                {showNewPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
           </div>
 
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Confirmer le mot de passe
+              Confirm password
             </label>
-            <input
-              type="password"
-              name="confirmPassword"
-              value={form.confirmPassword}
-              onChange={handleChange}
-              className="w-full rounded-2xl border border-slate-300 px-4 py-3.5 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-              required
-            />
+
+            <div className="relative">
+              <input
+                type={showConfirmPassword ? "text" : "password"}
+                name="confirmPassword"
+                value={form.confirmPassword}
+                onChange={handleChange}
+                className="w-full rounded-2xl border border-slate-300 px-4 py-3.5 pr-12 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                required
+              />
+
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword((prev) => !prev)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 transition hover:text-slate-700"
+                aria-label={
+                  showConfirmPassword ? "Hide password" : "Show password"
+                }
+              >
+                {showConfirmPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+              </button>
+            </div>
           </div>
 
           <button
@@ -126,7 +155,7 @@ export default function ChangePasswordPage() {
             disabled={loading}
             className="w-full rounded-2xl bg-gradient-to-r from-[#12396b] via-blue-600 to-violet-600 px-5 py-3.5 text-white font-bold shadow-lg disabled:opacity-50"
           >
-            {loading ? "Enregistrement..." : "Changer le mot de passe"}
+            {loading ? "Saving..." : "Change password"}
           </button>
         </form>
       </div>

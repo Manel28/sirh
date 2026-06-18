@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import AppLayout from "../../layouts/AppLayout";
 import {
   getNotifications,
-  markAllNotificationsAsRead,
   markNotificationAsRead,
+  markAllNotificationsAsRead,
 } from "../../services/notificationService";
 
 export default function NotificationsPage() {
@@ -23,6 +23,11 @@ export default function NotificationsPage() {
       setLoading(true);
       setError("");
 
+      if (!user?.id) {
+        setNotifications([]);
+        return;
+      }
+
       const data = await getNotifications(user.id);
       setNotifications(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -34,9 +39,7 @@ export default function NotificationsPage() {
   };
 
   useEffect(() => {
-    if (user?.id) {
-      fetchNotifications();
-    }
+    fetchNotifications();
   }, []);
 
   const handleMarkAsRead = async (id) => {
@@ -50,11 +53,14 @@ export default function NotificationsPage() {
       );
     } catch (err) {
       console.error(err);
+      setError("Failed to mark notification as read.");
     }
   };
 
   const handleMarkAllAsRead = async () => {
     try {
+      if (!user?.id) return;
+
       await markAllNotificationsAsRead(user.id);
 
       setNotifications((prev) =>
@@ -62,6 +68,7 @@ export default function NotificationsPage() {
       );
     } catch (err) {
       console.error(err);
+      setError("Failed to mark all notifications as read.");
     }
   };
 
@@ -73,6 +80,7 @@ export default function NotificationsPage() {
             <h3 className="text-2xl font-bold text-slate-800">
               Notifications
             </h3>
+
             <p className="text-slate-500 mt-2">
               You have {unreadCount} unread notification(s).
             </p>
@@ -88,7 +96,7 @@ export default function NotificationsPage() {
         </div>
 
         {error && (
-          <div className="rounded-xl bg-red-100 text-red-700 px-4 py-3">
+          <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-700">
             {error}
           </div>
         )}
@@ -114,6 +122,7 @@ export default function NotificationsPage() {
                       <span className="text-xl">
                         {getNotificationIcon(notification.type)}
                       </span>
+
                       <h4 className="font-bold text-slate-800">
                         {notification.title}
                       </h4>

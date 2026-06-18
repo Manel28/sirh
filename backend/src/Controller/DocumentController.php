@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\Document;
+use App\Entity\Notification;
 use App\Repository\DocumentRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -105,7 +106,6 @@ class DocumentController extends AbstractController
             }
 
             $fileName = uniqid('document_', true) . '.pdf';
-
             $file->move($uploadDir, $fileName);
 
             $document = new Document();
@@ -118,6 +118,16 @@ class DocumentController extends AbstractController
             $document->setUser($user);
 
             $entityManager->persist($document);
+
+            $notification = new Notification();
+            $notification->setUser($user);
+            $notification->setTitle('New document available');
+            $notification->setMessage(sprintf('A new document "%s" has been uploaded to your account.', $title));
+            $notification->setType('document');
+            $notification->setIsRead(false);
+            $notification->setCreatedAt(new \DateTime());
+
+            $entityManager->persist($notification);
             $entityManager->flush();
 
             return new JsonResponse([

@@ -17,17 +17,21 @@ export default function AppLayout({ title, children }) {
 
   useEffect(() => {
     const fetchUnreadNotifications = async () => {
-      if (!user?.id) return;
-
       try {
+        if (!user?.id) {
+          setUnreadNotifications(0);
+          return;
+        }
+
         const data = await getNotifications(user.id);
-        const count = Array.isArray(data)
+        const unread = Array.isArray(data)
           ? data.filter((item) => !item.isRead).length
           : 0;
 
-        setUnreadNotifications(count);
-      } catch (err) {
-        console.error(err);
+        setUnreadNotifications(unread);
+      } catch (error) {
+        console.error("Failed to load notification count:", error);
+        setUnreadNotifications(0);
       }
     };
 
@@ -153,8 +157,8 @@ export default function AppLayout({ title, children }) {
                 </MobileButton>
 
                 <MobileButton onClick={() => goTo("/notifications")}>
-                  Notifications{" "}
-                  {unreadNotifications > 0 ? `(${unreadNotifications})` : ""}
+                  Notifications
+                  {unreadNotifications > 0 && ` (${unreadNotifications})`}
                 </MobileButton>
 
                 {isAdmin && (
