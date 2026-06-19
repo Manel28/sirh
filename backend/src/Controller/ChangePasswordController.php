@@ -9,8 +9,21 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
+/**
+ * Contrôleur dédié au changement de mot de passe.
+ *
+ * Il permet :
+ * - de recevoir un nouveau mot de passe depuis le frontend 
+ * - de vérifier sa complexité 
+ * - de le chiffrer 
+ * - de désactiver l'obligation de changement de mot de passe 
+ * - de retourner les informations utilisateur mises à jour
+ */
 class ChangePasswordController
 {
+    /**
+     * Change le mot de passe d'un utilisateur.
+     */
     #[Route('/api/change-password', name: 'api_change_password', methods: ['POST'])]
     public function changePassword(
         Request $request,
@@ -19,14 +32,27 @@ class ChangePasswordController
         EntityManagerInterface $entityManager
     ): JsonResponse {
         try {
+            // Décodage des données JSON envoyées par le frontend
             $data = json_decode($request->getContent(), true);
 
+            // Vérification des champs obligatoires
             if (!$data || empty($data['userId']) || empty($data['newPassword'])) {
                 return new JsonResponse(['message' => 'Missing required fields'], 400);
             }
 
+            // Récupération du nouveau mot de passe
             $password = $data['newPassword'];
 
+            /**
+             * Vérification de la complexité du mot de passe.
+             *
+             * Le mot de passe doit contenir :
+             * - au moins 8 caractères ;
+             * - une lettre majuscule ;
+             * - une lettre minuscule ;
+             * - un chiffre ;
+             * - un caractère spécial.
+             */
             if (
                 strlen($password) < 8 ||
                 !preg_match('/[A-Z]/', $password) ||
@@ -39,17 +65,25 @@ class ChangePasswordController
                 ], 400);
             }
 
+            // Recherche de l'utilisateur concerné
             $user = $userRepository->find($data['userId']);
 
             if (!$user) {
                 return new JsonResponse(['message' => 'User not found'], 404);
             }
 
-            $user->setPassword($passwordHasher->hashPassword($user, $password));
+            // Chiffrement du nouveau mot de passe
+            $user->setPassword(
+                $passwordHasher->hashPassword($user, $password)
+            );
+
+            // L'utilisateur n'a plus besoin de changer son mot de passe
             $user->setMustChangePassword(false);
 
+            // Sauvegarde en base de données
             $entityManager->flush();
 
+            // Retour des informations utilisateur mises à jour
             return new JsonResponse([
                 'message' => 'Password changed successfully',
                 'user' => [
@@ -65,6 +99,7 @@ class ChangePasswordController
                 ]
             ]);
         } catch (\Throwable $e) {
+            // Gestion des erreurs serveur
             return new JsonResponse([
                 'error' => $e->getMessage(),
             ], 500);
