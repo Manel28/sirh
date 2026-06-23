@@ -1,34 +1,57 @@
+// Import des hooks React pour gérer les effets, les états et les calculs optimisés
 import { useEffect, useMemo, useState } from "react";
+
+// Import du layout principal des pages connectées
 import AppLayout from "../../layouts/AppLayout";
+
+// Import des services API liés aux demandes de congé
 import {
   createLeave,
   getLeaves,
   updateLeaveStatus,
 } from "../../services/leaveService";
 
+/**
+ * Calcule le nombre de jours ouvrés entre deux dates.
+ *
+ * Les samedis et dimanches ne sont pas comptés.
+ */
 function countWorkingDays(startDateString, endDateString) {
   const start = new Date(startDateString);
   const end = new Date(endDateString);
 
+  // Vérifie que les dates sont valides
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0;
+
+  // Si la date de fin est avant la date de début, on retourne 0
   if (end < start) return 0;
 
   let count = 0;
   const current = new Date(start);
 
+  // Parcours de chaque jour de la période
   while (current <= end) {
     const day = current.getDay();
+
+    // On compte uniquement les jours du lundi au vendredi
     if (day !== 0 && day !== 6) count += 1;
+
     current.setDate(current.getDate() + 1);
   }
 
   return count;
 }
 
+/**
+ * Formate une période de congé pour l'affichage.
+ */
 function formatPeriod(start, end) {
   return `From ${start} to ${end}`;
 }
 
+/**
+ * Retourne les classes CSS correspondant au statut d'une demande.
+ */
 function getStatusBadgeClass(status) {
   switch (status) {
     case "Approved":
@@ -42,6 +65,9 @@ function getStatusBadgeClass(status) {
   }
 }
 
+/**
+ * Retourne le texte affiché selon le statut.
+ */
 function getStatusLabel(status) {
   switch (status) {
     case "Approved":
@@ -55,29 +81,65 @@ function getStatusLabel(status) {
   }
 }
 
+/**
+ * Page de gestion des congés.
+ *
+ * Pour un collaborateur :
+ * - création d'une demande ;
+ * - suivi de ses demandes ;
+ * - annulation d'une demande en attente ;
+ * - affichage du solde restant.
+ *
+ * Pour un administrateur/RH :
+ * - consultation de toutes les demandes ;
+ * - approbation ou refus des demandes des collaborateurs ;
+ * - consultation du solde des collaborateurs.
+ */
 export default function LeavesPage() {
+  // Récupération de l'utilisateur connecté
   const user = JSON.parse(localStorage.getItem("user") || "null");
+
+  // Vérifie si l'utilisateur est administrateur/RH
   const isAdmin = user?.roles?.includes("ROLE_ADMIN");
 
+  // Contrôle l'ouverture de la modale de création
   const [showModal, setShowModal] = useState(false);
+
+  // Message d'erreur affiché à l'utilisateur
   const [error, setError] = useState("");
+
+  // Liste des demandes de congé
   const [leaves, setLeaves] = useState([]);
+
+  // Solde de congés restant
   const [leaveBalance, setLeaveBalance] = useState(25);
+
+  // État de chargement de la liste
   const [loading, setLoading] = useState(true);
+
+  // État indiquant qu'une action est en cours
   const [submitting, setSubmitting] = useState(false);
 
+  // Données du formulaire de demande de congé
   const [form, setForm] = useState({
     type: "",
     start: "",
     end: "",
   });
 
+  // Date du jour au format YYYY-MM-DD pour empêcher les dates passées
   const today = new Date().toISOString().split("T")[0];
 
+  /**
+   * Charge les demandes de congé au premier affichage de la page.
+   */
   useEffect(() => {
     fetchLeaves();
   }, []);
 
+  /**
+   * Calcule les statistiques des demandes selon leur statut.
+   */
   const stats = useMemo(() => {
     return {
       pending: leaves.filter((l) => l.status === "Pending").length,
@@ -87,6 +149,9 @@ export default function LeavesPage() {
     };
   }, [leaves]);
 
+  /**
+   * Récupère les demandes de congé depuis l'API.
+   */
   const fetchLeaves = async () => {
     try {
       setLoading(true);
@@ -94,7 +159,10 @@ export default function LeavesPage() {
 
       const data = await getLeaves();
 
+      // La réponse peut être directement un tableau ou contenir une propriété leaves
       setLeaves(Array.isArray(data) ? data : data.leaves || []);
+
+      // Mise à jour du solde de congés si l'API le retourne
       setLeaveBalance(data.leaveBalance ?? 25);
     } catch (err) {
       console.error(err);
@@ -104,6 +172,9 @@ export default function LeavesPage() {
     }
   };
 
+  /**
+   * Réinitialise le formulaire de demande.
+   */
   const resetForm = () => {
     setForm({
       type: "",
@@ -114,11 +185,17 @@ export default function LeavesPage() {
     setError("");
   };
 
+  /**
+   * Ferme la modale de création et vide le formulaire.
+   */
   const closeModal = () => {
     resetForm();
     setShowModal(false);
   };
 
+  /**
+   * Vérifie les champs du formulaire avant l'envoi.
+   */
   const validateForm = () => {
     if (!form.type || !form.start || !form.end) {
       return "Please fill in all required fields.";
@@ -139,7 +216,11 @@ export default function LeavesPage() {
     return "";
   };
 
+  /**
+   * Crée une nouvelle demande de congé.
+   */
   const handleSubmit = async () => {
+    // Vérification des champs avant appel API
     const validationError = validateForm();
 
     if (validationError) {
@@ -151,16 +232,19 @@ export default function LeavesPage() {
       setSubmitting(true);
       setError("");
 
+      // Envoi de la demande à l'API
       const response = await createLeave({
         type: form.type,
         start: form.start,
         end: form.end,
       });
 
+      // Mise à jour du solde si l'API le renvoie
       if (response?.leaveBalance !== undefined) {
         setLeaveBalance(response.leaveBalance);
       }
 
+      // Recharge les demandes et ferme la modale
       await fetchLeaves();
       closeModal();
     } catch (err) {
@@ -176,12 +260,16 @@ export default function LeavesPage() {
     }
   };
 
+  /**
+   * Annule une demande en attente appartenant à l'utilisateur connecté.
+   */
   const handleCancelRequest = async (leaveId) => {
     try {
       setSubmitting(true);
       setError("");
 
       await updateLeaveStatus(leaveId, "Cancelled");
+
       await fetchLeaves();
     } catch (err) {
       console.error(err);
@@ -196,12 +284,16 @@ export default function LeavesPage() {
     }
   };
 
+  /**
+   * Permet à l'administrateur/RH d'approuver ou de refuser une demande.
+   */
   const handleAdminStatusUpdate = async (leaveId, status) => {
     try {
       setError("");
 
       const response = await updateLeaveStatus(leaveId, status);
 
+      // Mise à jour du solde si l'approbation modifie les jours restants
       if (response?.leaveBalance !== undefined) {
         setLeaveBalance(response.leaveBalance);
       }
@@ -221,6 +313,7 @@ export default function LeavesPage() {
   return (
     <AppLayout title={isAdmin ? "Leave Requests" : "My Leaves"}>
       <div className="space-y-6">
+        {/* En-tête principal de la page */}
         <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.08)]">
           <div className="bg-gradient-to-r from-[#12396b] via-blue-600 to-orange-500 px-6 py-8 md:px-8">
             <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
@@ -240,6 +333,7 @@ export default function LeavesPage() {
                 </p>
               </div>
 
+              {/* Bouton d'ouverture de la modale */}
               <button
                 onClick={() => {
                   setError("");
@@ -253,12 +347,14 @@ export default function LeavesPage() {
           </div>
         </section>
 
+        {/* Message d'erreur hors modale */}
         {error && !showModal && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-700">
             {error}
           </div>
         )}
 
+        {/* Cartes statistiques */}
         <section className="grid grid-cols-1 gap-4 md:grid-cols-5">
           <StatusCard
             label="Remaining Leave"
@@ -291,6 +387,7 @@ export default function LeavesPage() {
           />
         </section>
 
+        {/* Tableau des demandes de congé */}
         <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.08)]">
           <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-orange-50/40 px-6 py-5">
             <h2 className="text-xl font-bold text-slate-900">
@@ -308,6 +405,7 @@ export default function LeavesPage() {
             <table className="w-full min-w-[950px] text-left">
               <thead className="bg-gradient-to-r from-[#12396b] to-blue-600 text-white">
                 <tr>
+                  {/* Colonne employé visible uniquement pour les administrateurs */}
                   {isAdmin && (
                     <th className="p-4 text-sm font-semibold">Employee</th>
                   )}
@@ -325,6 +423,7 @@ export default function LeavesPage() {
 
               <tbody>
                 {loading ? (
+                  // Ligne affichée pendant le chargement
                   <tr>
                     <td
                       colSpan={isAdmin ? 7 : 6}
@@ -334,9 +433,12 @@ export default function LeavesPage() {
                     </td>
                   </tr>
                 ) : leaves.length > 0 ? (
+                  // Affichage des demandes de congé
                   leaves.map((leave) => {
                     const isOwnLeave = leave.user?.id === user?.id;
                     const isPending = leave.status === "Pending";
+
+                    // Solde affiché selon le propriétaire de la demande
                     const rowBalance = isOwnLeave
                       ? leaveBalance
                       : leave.user?.leaveBalance ?? 25;
@@ -346,41 +448,49 @@ export default function LeavesPage() {
                         key={leave.id}
                         className="border-t border-slate-200 transition hover:bg-blue-50/40"
                       >
-                       {isAdmin && (
-  <td className="p-4 font-semibold text-slate-800">
-    <div>
-      {leave.user?.firstName || leave.user?.lastName
-        ? `${leave.user?.firstName || ""} ${
-            leave.user?.lastName || ""
-          }`
-        : leave.user?.email || "Unknown"}
+                        {/* Informations employé visibles côté admin */}
+                        {isAdmin && (
+                          <td className="p-4 font-semibold text-slate-800">
+                            <div>
+                              {leave.user?.firstName || leave.user?.lastName
+                                ? `${leave.user?.firstName || ""} ${
+                                    leave.user?.lastName || ""
+                                  }`
+                                : leave.user?.email || "Unknown"}
 
-      {isOwnLeave && (
-        <span className="ml-2 rounded-full bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">
-          Me
-        </span>
-      )}
-    </div>
+                              {isOwnLeave && (
+                                <span className="ml-2 rounded-full bg-blue-100 px-2 py-1 text-xs font-bold text-blue-700">
+                                  Me
+                                </span>
+                              )}
+                            </div>
 
-    <div className="mt-1 text-xs font-bold text-blue-700">
-      Remaining leave: {leave.user?.leaveBalance ?? 25} day(s)
-    </div>
-  </td>
-)}
+                            <div className="mt-1 text-xs font-bold text-blue-700">
+                              Remaining leave:{" "}
+                              {leave.user?.leaveBalance ?? 25} day(s)
+                            </div>
+                          </td>
+                        )}
+
+                        {/* Type de congé */}
                         <td className="p-4">{leave.type}</td>
 
+                        {/* Période */}
                         <td className="p-4">
                           {formatPeriod(leave.start, leave.end)}
                         </td>
 
+                        {/* Durée calculée en jours ouvrés */}
                         <td className="p-4">
                           {countWorkingDays(leave.start, leave.end)} day(s)
                         </td>
 
+                        {/* Solde restant */}
                         <td className="p-4 font-bold text-blue-700">
                           {rowBalance} day(s)
                         </td>
 
+                        {/* Statut */}
                         <td className="p-4">
                           <span
                             className={`inline-flex rounded-full border px-3 py-1 text-sm font-semibold ${getStatusBadgeClass(
@@ -391,8 +501,10 @@ export default function LeavesPage() {
                           </span>
                         </td>
 
+                        {/* Actions disponibles selon le rôle et le statut */}
                         <td className="p-4">
                           {isAdmin && isPending && !isOwnLeave ? (
+                            // L'admin peut approuver ou refuser les demandes des autres
                             <div className="flex gap-2">
                               <button
                                 onClick={() =>
@@ -419,6 +531,7 @@ export default function LeavesPage() {
                               </button>
                             </div>
                           ) : isOwnLeave && isPending ? (
+                            // L'utilisateur peut annuler sa propre demande en attente
                             <button
                               onClick={() => handleCancelRequest(leave.id)}
                               disabled={submitting}
@@ -427,6 +540,7 @@ export default function LeavesPage() {
                               Cancel Request
                             </button>
                           ) : (
+                            // Aucune action possible pour les autres cas
                             <span className="text-sm text-slate-400">
                               No action
                             </span>
@@ -436,6 +550,7 @@ export default function LeavesPage() {
                     );
                   })
                 ) : (
+                  // Message si aucune demande n'est disponible
                   <tr>
                     <td
                       colSpan={isAdmin ? 7 : 6}
@@ -450,6 +565,7 @@ export default function LeavesPage() {
           </div>
         </section>
 
+        {/* Modale de création d'une demande */}
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
             <div className="w-full max-w-lg rounded-[28px] border border-slate-100 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.18)]">
@@ -466,17 +582,20 @@ export default function LeavesPage() {
                 </button>
               </div>
 
+              {/* Message d'erreur dans la modale */}
               {error && (
                 <div className="mb-4 rounded-lg bg-red-100 px-4 py-3 text-sm text-red-700">
                   {error}
                 </div>
               )}
 
+              {/* Affichage du solde disponible */}
               <div className="mb-4 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-semibold text-blue-700">
                 Remaining leave balance: {leaveBalance} day(s)
               </div>
 
               <div className="space-y-4">
+                {/* Sélection du type de congé */}
                 <div>
                   <label className="mb-2 block text-sm font-medium text-slate-700">
                     Leave Type *
@@ -508,6 +627,7 @@ export default function LeavesPage() {
                   </select>
                 </div>
 
+                {/* Sélection des dates */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-700">
@@ -548,6 +668,7 @@ export default function LeavesPage() {
                   </div>
                 </div>
 
+                {/* Durée estimée de la demande */}
                 {form.start && form.end && (
                   <div className="rounded-xl border border-orange-100 bg-orange-50 px-4 py-3 text-sm font-semibold text-orange-700">
                     Requested duration:{" "}
@@ -556,6 +677,7 @@ export default function LeavesPage() {
                 )}
               </div>
 
+              {/* Boutons de la modale */}
               <div className="mt-6 flex justify-end gap-3">
                 <button
                   onClick={closeModal}
@@ -581,6 +703,9 @@ export default function LeavesPage() {
   );
 }
 
+/**
+ * Carte statistique affichant un statut de congé.
+ */
 function StatusCard({ label, value, className }) {
   return (
     <div className={`rounded-2xl border px-5 py-4 shadow-sm ${className}`}>

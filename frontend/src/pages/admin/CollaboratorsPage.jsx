@@ -7,16 +7,43 @@ import {
   updateCollaborator,
 } from "../../services/userService";
 
+/**
+ * Page de gestion des collaborateurs.
+ *
+ * Cette page permet à l'administrateur/RH de :
+ * - afficher tous les collaborateurs 
+ * - créer un nouveau collaborateur 
+ * - modifier les informations d'un collaborateur 
+ * - supprimer un collaborateur 
+ * - rechercher un collaborateur 
+ * - gérer le rôle collaborateur ou administrateur/RH
+ */
 export default function CollaboratorsPage() {
+  // Liste des collaborateurs récupérés depuis l'API
   const [collaborators, setCollaborators] = useState([]);
+
+  // Indique si les données sont en cours de chargement
   const [loading, setLoading] = useState(true);
+
+  // Indique si un formulaire est en cours d'envoi
   const [submitting, setSubmitting] = useState(false);
+
+  // Stocke l'identifiant du collaborateur en cours de suppression
   const [deletingId, setDeletingId] = useState(null);
+
+  // Message de succès affiché à l'utilisateur
   const [message, setMessage] = useState("");
+
+  // Message d'erreur affiché à l'utilisateur
   const [error, setError] = useState("");
+
+  // Valeur saisie dans la barre de recherche
   const [search, setSearch] = useState("");
+
+  // Collaborateur actuellement sélectionné pour modification
   const [editingUser, setEditingUser] = useState(null);
 
+  // État du formulaire de création d'un collaborateur
   const [form, setForm] = useState({
     firstName: "",
     lastName: "",
@@ -27,29 +54,52 @@ export default function CollaboratorsPage() {
     isAdmin: false,
   });
 
+  /**
+   * Récupère la liste complète des collaborateurs depuis l'API.
+   */
   const fetchCollaborators = async () => {
     try {
+      // Active l'affichage du chargement
       setLoading(true);
+
+      // Réinitialise les anciennes erreurs
       setError("");
+
+      // Appel au service API
       const data = await getCollaborators();
+
+      // Vérifie que la réponse est un tableau avant de mettre à jour l'état
       setCollaborators(Array.isArray(data) ? data : []);
     } catch (err) {
+      // Affiche l'erreur dans la console pour le débogage
       console.error(err);
+
+      // Affiche un message d'erreur à l'utilisateur
       setError("Failed to load collaborators.");
     } finally {
+      // Désactive le chargement dans tous les cas
       setLoading(false);
     }
   };
 
+  /**
+   * Charge les collaborateurs automatiquement au montage du composant.
+   */
   useEffect(() => {
     fetchCollaborators();
   }, []);
 
+  /**
+   * Filtre les collaborateurs selon la recherche saisie.
+   */
   const filteredCollaborators = useMemo(() => {
+    // Nettoie la recherche et la met en minuscules
     const query = search.trim().toLowerCase();
 
+    // Si aucune recherche n'est saisie, on retourne toute la liste
     if (!query) return collaborators;
 
+    // Filtre sur le nom complet, l'email, le poste ou le département
     return collaborators.filter((item) => {
       const fullName = [item.firstName, item.lastName]
         .filter(Boolean)
@@ -65,7 +115,11 @@ export default function CollaboratorsPage() {
     });
   }, [collaborators, search]);
 
+  /**
+   * Calcule les statistiques affichées en haut de page.
+   */
   const stats = useMemo(() => {
+    // Compte les utilisateurs ayant le rôle administrateur
     const admins = collaborators.filter((item) =>
       item.roles?.includes("ROLE_ADMIN")
     ).length;
@@ -77,6 +131,9 @@ export default function CollaboratorsPage() {
     };
   }, [collaborators]);
 
+  /**
+   * Réinitialise le formulaire de création.
+   */
   const resetForm = () => {
     setForm({
       firstName: "",
@@ -89,35 +146,53 @@ export default function CollaboratorsPage() {
     });
   };
 
+  /**
+   * Gère la création d'un collaborateur.
+   */
   const handleSubmit = async (e) => {
+    // Empêche le rechargement automatique de la page
     e.preventDefault();
 
     try {
+      // Active l'état d'envoi
       setSubmitting(true);
+
+      // Réinitialise les messages
       setMessage("");
       setError("");
 
+      // Envoie les données du formulaire à l'API
       const response = await createCollaborator(form);
 
+      // Affiche le message de succès
       setMessage(
         response.message ||
           "Collaborator created successfully. An email has been sent."
       );
 
+      // Vide le formulaire
       resetForm();
+
+      // Recharge la liste des collaborateurs
       await fetchCollaborators();
     } catch (err) {
       console.error(err);
+
+      // Affiche le message d'erreur renvoyé par l'API si disponible
       setError(
         err?.response?.data?.message ||
           err?.response?.data?.error ||
           "Failed to create collaborator."
       );
     } finally {
+      // Désactive l'état d'envoi
       setSubmitting(false);
     }
   };
 
+  /**
+   * Gère la modification d'un collaborateur existant.
+   */
   const handleEdit = async (e) => {
     e.preventDefault();
 
@@ -126,6 +201,7 @@ export default function CollaboratorsPage() {
       setMessage("");
       setError("");
 
+      // Envoie les nouvelles informations du collaborateur à l'API
       const response = await updateCollaborator(editingUser.id, {
         firstName: editingUser.firstName,
         lastName: editingUser.lastName,
@@ -138,11 +214,17 @@ export default function CollaboratorsPage() {
           editingUser.roles?.includes("ROLE_ADMIN"),
       });
 
+      // Affiche le message de succès
       setMessage(response.message || "Collaborator updated successfully.");
+
+      // Ferme la fenêtre de modification
       setEditingUser(null);
+
+      // Recharge la liste
       await fetchCollaborators();
     } catch (err) {
       console.error(err);
+
       setError(
         err?.response?.data?.message ||
           err?.response?.data?.error ||
@@ -153,30 +235,44 @@ export default function CollaboratorsPage() {
     }
   };
 
+  /**
+   * Supprime un collaborateur après confirmation.
+   *
+   * @param {number} userId Identifiant du collaborateur à supprimer
+   */
   const handleDelete = async (userId) => {
+    // Demande confirmation avant suppression
     const confirmDelete = window.confirm(
       "Are you sure you want to delete this collaborator?"
     );
 
+    // Annule la suppression si l'utilisateur refuse
     if (!confirmDelete) return;
 
     try {
+      // Stocke l'identifiant supprimé pour afficher l'état "Deleting..."
       setDeletingId(userId);
       setMessage("");
       setError("");
 
+      // Appel API de suppression
       const response = await deleteCollaborator(userId);
 
+      // Retire directement le collaborateur supprimé de la liste locale
       setCollaborators((prev) => prev.filter((item) => item.id !== userId));
+
+      // Affiche un message de succès
       setMessage(response.message || "Collaborator deleted successfully.");
     } catch (err) {
       console.error(err);
+
       setError(
         err?.response?.data?.message ||
           err?.response?.data?.error ||
           "Failed to delete collaborator."
       );
     } finally {
+      // Réinitialise l'état de suppression
       setDeletingId(null);
     }
   };
@@ -184,6 +280,7 @@ export default function CollaboratorsPage() {
   return (
     <AppLayout title="Collaborators Management">
       <div className="space-y-6">
+        {/* En-tête de la page */}
         <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.08)]">
           <div className="bg-gradient-to-r from-[#12396b] via-blue-600 to-orange-500 px-6 py-8 md:px-8">
             <h1 className="text-3xl font-extrabold text-white">
@@ -196,12 +293,14 @@ export default function CollaboratorsPage() {
           </div>
         </section>
 
+        {/* Cartes statistiques */}
         <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <StatCard label="Total Accounts" value={stats.total} />
           <StatCard label="Collaborators" value={stats.collaborators} />
           <StatCard label="Admin / HR" value={stats.admins} />
         </section>
 
+        {/* Affichage des messages de succès ou d'erreur */}
         {(message || error) && (
           <div className="space-y-3">
             {message && (
@@ -219,6 +318,7 @@ export default function CollaboratorsPage() {
         )}
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+          {/* Formulaire de création */}
           <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.06)] xl:col-span-1">
             <div className="mb-6">
               <h3 className="text-xl font-bold text-slate-900">
@@ -230,18 +330,21 @@ export default function CollaboratorsPage() {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Champ prénom */}
               <FormInput
                 placeholder="First Name *"
                 value={form.firstName}
                 onChange={(value) => setForm({ ...form, firstName: value })}
               />
 
+              {/* Champ nom */}
               <FormInput
                 placeholder="Last Name *"
                 value={form.lastName}
                 onChange={(value) => setForm({ ...form, lastName: value })}
               />
 
+              {/* Champ email */}
               <FormInput
                 type="email"
                 placeholder="Email *"
@@ -249,24 +352,28 @@ export default function CollaboratorsPage() {
                 onChange={(value) => setForm({ ...form, email: value })}
               />
 
+              {/* Champ poste */}
               <FormInput
                 placeholder="Job Title *"
                 value={form.jobTitle}
                 onChange={(value) => setForm({ ...form, jobTitle: value })}
               />
 
+              {/* Champ département */}
               <FormInput
                 placeholder="Department *"
                 value={form.department}
                 onChange={(value) => setForm({ ...form, department: value })}
               />
 
+              {/* Champ photo */}
               <FormInput
                 placeholder="Photo URL"
                 value={form.photo}
                 onChange={(value) => setForm({ ...form, photo: value })}
               />
 
+              {/* Case permettant de créer un compte administrateur/RH */}
               <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
                 <input
                   type="checkbox"
@@ -279,6 +386,7 @@ export default function CollaboratorsPage() {
                 Create as HR / Admin
               </label>
 
+              {/* Bouton de soumission */}
               <button
                 type="submit"
                 disabled={submitting}
@@ -289,6 +397,7 @@ export default function CollaboratorsPage() {
             </form>
           </div>
 
+          {/* Tableau des collaborateurs */}
           <div className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.06)] xl:col-span-2">
             <div className="flex flex-col gap-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-orange-50/40 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
               <div>
@@ -300,6 +409,7 @@ export default function CollaboratorsPage() {
                 </p>
               </div>
 
+              {/* Barre de recherche */}
               <input
                 type="text"
                 placeholder="Search collaborator..."
@@ -309,6 +419,7 @@ export default function CollaboratorsPage() {
               />
             </div>
 
+            {/* Affichage du chargement ou du tableau */}
             {loading ? (
               <div className="p-8 text-center font-semibold text-slate-500">
                 Loading collaborators...
@@ -332,6 +443,7 @@ export default function CollaboratorsPage() {
                   <tbody>
                     {filteredCollaborators.length > 0 ? (
                       filteredCollaborators.map((item) => {
+                        // Vérifie si l'utilisateur affiché est administrateur
                         const isAdmin = item.roles?.includes("ROLE_ADMIN");
 
                         return (
@@ -339,6 +451,7 @@ export default function CollaboratorsPage() {
                             key={item.id}
                             className="border-t border-slate-200 transition hover:bg-blue-50/40"
                           >
+                            {/* Photo ou initiale du collaborateur */}
                             <td className="p-4">
                               {item.photo ? (
                                 <img
@@ -355,16 +468,20 @@ export default function CollaboratorsPage() {
                               )}
                             </td>
 
+                            {/* Prénom */}
                             <td className="p-4 font-semibold text-slate-800">
                               {item.firstName || "-"}
                             </td>
 
+                            {/* Nom */}
                             <td className="p-4">{item.lastName || "-"}</td>
 
+                            {/* Email */}
                             <td className="p-4 text-slate-600">
                               {item.email}
                             </td>
 
+                            {/* Rôle */}
                             <td className="p-4">
                               <span
                                 className={`rounded-full px-3 py-1 text-xs font-bold ${
@@ -377,12 +494,16 @@ export default function CollaboratorsPage() {
                               </span>
                             </td>
 
+                            {/* Poste */}
                             <td className="p-4">{item.jobTitle || "-"}</td>
 
+                            {/* Département */}
                             <td className="p-4">{item.department || "-"}</td>
 
+                            {/* Actions */}
                             <td className="p-4">
                               <div className="flex items-center gap-2">
+                                {/* Bouton modification */}
                                 <button
                                   onClick={() =>
                                     setEditingUser({
@@ -396,6 +517,7 @@ export default function CollaboratorsPage() {
                                   Edit
                                 </button>
 
+                                {/* Les administrateurs sont protégés contre la suppression */}
                                 {!isAdmin ? (
                                   <button
                                     onClick={() => handleDelete(item.id)}
@@ -417,6 +539,7 @@ export default function CollaboratorsPage() {
                         );
                       })
                     ) : (
+                      // Message affiché si aucun collaborateur ne correspond
                       <tr>
                         <td
                           colSpan="8"
@@ -434,6 +557,7 @@ export default function CollaboratorsPage() {
         </div>
       </div>
 
+      {/* Fenêtre modale de modification */}
       {editingUser && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-xl rounded-[28px] bg-white p-6 shadow-2xl">
@@ -442,6 +566,7 @@ export default function CollaboratorsPage() {
             </h2>
 
             <form onSubmit={handleEdit} className="space-y-4">
+              {/* Modification du prénom */}
               <FormInput
                 placeholder="First Name *"
                 value={editingUser.firstName || ""}
@@ -450,6 +575,7 @@ export default function CollaboratorsPage() {
                 }
               />
 
+              {/* Modification du nom */}
               <FormInput
                 placeholder="Last Name *"
                 value={editingUser.lastName || ""}
@@ -458,6 +584,7 @@ export default function CollaboratorsPage() {
                 }
               />
 
+              {/* Modification de l'email */}
               <FormInput
                 type="email"
                 placeholder="Email *"
@@ -467,6 +594,7 @@ export default function CollaboratorsPage() {
                 }
               />
 
+              {/* Modification du poste */}
               <FormInput
                 placeholder="Job Title *"
                 value={editingUser.jobTitle || ""}
@@ -475,6 +603,7 @@ export default function CollaboratorsPage() {
                 }
               />
 
+              {/* Modification du département */}
               <FormInput
                 placeholder="Department *"
                 value={editingUser.department || ""}
@@ -483,6 +612,7 @@ export default function CollaboratorsPage() {
                 }
               />
 
+              {/* Modification de la photo */}
               <FormInput
                 placeholder="Photo URL"
                 value={editingUser.photo || ""}
@@ -491,6 +621,7 @@ export default function CollaboratorsPage() {
                 }
               />
 
+              {/* Modification du rôle RH/Admin */}
               <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">
                 <input
                   type="checkbox"
@@ -506,6 +637,7 @@ export default function CollaboratorsPage() {
                 HR / Admin
               </label>
 
+              {/* Boutons de la modale */}
               <div className="flex justify-end gap-3 pt-4">
                 <button
                   type="button"
@@ -531,6 +663,14 @@ export default function CollaboratorsPage() {
   );
 }
 
+/**
+ * Champ de formulaire réutilisable.
+ *
+ * @param {string} type Type du champ input
+ * @param {string} placeholder Texte affiché dans le champ
+ * @param {string} value Valeur du champ
+ * @param {Function} onChange Fonction appelée lors de la saisie
+ */
 function FormInput({ type = "text", placeholder, value, onChange }) {
   return (
     <input
@@ -543,6 +683,12 @@ function FormInput({ type = "text", placeholder, value, onChange }) {
   );
 }
 
+/**
+ * Carte statistique utilisée pour afficher une valeur simple.
+ *
+ * @param {string} label Titre de la statistique
+ * @param {number} value Valeur affichée
+ */
 function StatCard({ label, value }) {
   return (
     <div className="rounded-[24px] border border-slate-200 bg-gradient-to-br from-blue-50 to-white px-5 py-5 shadow-sm">

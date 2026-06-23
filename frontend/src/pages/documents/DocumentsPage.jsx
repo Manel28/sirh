@@ -1,6 +1,13 @@
+// Import des hooks React pour gérer les états, les effets et les calculs optimisés
 import { useEffect, useMemo, useState } from "react";
+
+// Import du layout principal de l'application
 import AppLayout from "../../layouts/AppLayout";
+
+// Service permettant de récupérer les collaborateurs
 import { getCollaborators } from "../../services/userService";
+
+// Services liés à la gestion des documents
 import {
   deleteDocument,
   getDocuments,
@@ -8,6 +15,7 @@ import {
   uploadDocument,
 } from "../../services/documentService";
 
+// Catégories disponibles pour classer les documents RH
 const CATEGORIES = [
   "Payroll",
   "Administrative",
@@ -17,23 +25,47 @@ const CATEGORIES = [
   "Personal",
 ];
 
+/**
+ * Page de gestion des documents.
+ *
+ * Cette page permet :
+ * - aux collaborateurs de consulter leurs documents ;
+ * - aux administrateurs/RH d'ajouter, modifier et supprimer des documents ;
+ * - de filtrer les documents par catégorie ;
+ * - de rechercher un document ;
+ * - de séparer les documents RH et les documents collaborateurs.
+ */
 export default function DocumentsPage() {
+  // Récupération de l'utilisateur connecté
   const user = JSON.parse(localStorage.getItem("user") || "null");
+
+  // Vérifie si l'utilisateur possède le rôle administrateur/RH
   const isAdmin = user?.roles?.includes("ROLE_ADMIN");
 
+  // Liste des documents récupérés depuis l'API
   const [documents, setDocuments] = useState([]);
+
+  // Liste des collaborateurs utilisée dans le formulaire d'upload
   const [collaborators, setCollaborators] = useState([]);
+
+  // États d'affichage et de traitement
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [editingDocument, setEditingDocument] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+
+  // Messages utilisateur
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  // États liés à la recherche et au filtre
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
+
+  // Contrôle l'ouverture de la modale d'upload
   const [showUploadModal, setShowUploadModal] = useState(false);
 
+  // Données du formulaire d'ajout de document
   const [form, setForm] = useState({
     title: "",
     category: "Payroll",
@@ -41,6 +73,12 @@ export default function DocumentsPage() {
     file: null,
   });
 
+  /**
+   * Chargement initial des documents.
+   *
+   * Si l'utilisateur est administrateur,
+   * on charge aussi la liste des collaborateurs.
+   */
   useEffect(() => {
     fetchDocuments();
 
@@ -49,11 +87,17 @@ export default function DocumentsPage() {
     }
   }, [isAdmin]);
 
+  /**
+   * Récupère tous les documents depuis l'API.
+   */
   const fetchDocuments = async () => {
     try {
       setLoading(true);
       setError("");
+
       const data = await getDocuments();
+
+      // Vérifie que la réponse est bien un tableau
       setDocuments(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error(err);
@@ -63,6 +107,12 @@ export default function DocumentsPage() {
     }
   };
 
+  /**
+   * Récupère les collaborateurs.
+   *
+   * Cette fonction est utilisée par les administrateurs
+   * pour associer un document à un utilisateur.
+   */
   const fetchCollaborators = async () => {
     try {
       const data = await getCollaborators();
@@ -72,6 +122,14 @@ export default function DocumentsPage() {
     }
   };
 
+  /**
+   * Filtre les documents selon :
+   * - la catégorie sélectionnée ;
+   * - le texte recherché ;
+   * - le titre ;
+   * - le type de fichier ;
+   * - l'email ou le nom du collaborateur.
+   */
   const filteredDocuments = useMemo(() => {
     return documents.filter((doc) => {
       const matchesCategory =
@@ -95,14 +153,23 @@ export default function DocumentsPage() {
     });
   }, [documents, searchTerm, selectedCategory]);
 
+  /**
+   * Documents appartenant à l'utilisateur connecté.
+   */
   const myDocuments = useMemo(() => {
     return filteredDocuments.filter((doc) => doc.user?.id === user?.id);
   }, [filteredDocuments, user?.id]);
 
+  /**
+   * Documents appartenant aux autres collaborateurs.
+   */
   const collaboratorDocuments = useMemo(() => {
     return filteredDocuments.filter((doc) => doc.user?.id !== user?.id);
   }, [filteredDocuments, user?.id]);
 
+  /**
+   * Statistiques affichées en haut de la page.
+   */
   const stats = useMemo(() => {
     return {
       total: documents.length,
@@ -112,6 +179,10 @@ export default function DocumentsPage() {
     };
   }, [documents]);
 
+  /**
+   * Ouvre la modale d'ajout d'un document
+   * et initialise le formulaire.
+   */
   const openUploadModal = () => {
     setForm({
       title: "",
@@ -119,16 +190,26 @@ export default function DocumentsPage() {
       userId: user?.id ? String(user.id) : "",
       file: null,
     });
+
     setError("");
     setSuccess("");
     setShowUploadModal(true);
   };
 
+  /**
+   * Ferme la modale d'ajout.
+   */
   const closeUploadModal = () => {
     setShowUploadModal(false);
     setError("");
   };
 
+  /**
+   * Envoie un nouveau document à l'API.
+   *
+   * Le fichier est envoyé avec FormData,
+   * car il s'agit d'un upload de fichier PDF.
+   */
   const handleUpload = async () => {
     if (!form.title || !form.category || !form.userId || !form.file) {
       setError("Please fill in all required fields.");
@@ -149,10 +230,12 @@ export default function DocumentsPage() {
       await uploadDocument(formData);
 
       await fetchDocuments();
+
       setSuccess("Document uploaded successfully.");
       setShowUploadModal(false);
     } catch (err) {
       console.error(err);
+
       setError(
         err?.response?.data?.message ||
           err?.response?.data?.error ||
@@ -163,6 +246,10 @@ export default function DocumentsPage() {
     }
   };
 
+  /**
+   * Ouvre la modale de modification
+   * avec les informations du document sélectionné.
+   */
   const openEditModal = (document) => {
     setEditingDocument({
       id: document.id,
@@ -170,15 +257,25 @@ export default function DocumentsPage() {
       category: document.category || "Payroll",
       userId: document.user?.id ? String(document.user.id) : "",
     });
+
     setError("");
     setSuccess("");
   };
 
+  /**
+   * Ferme la modale de modification.
+   */
   const closeEditModal = () => {
     setEditingDocument(null);
     setError("");
   };
 
+  /**
+   * Modifie les informations d'un document existant.
+   *
+   * Ici, seul le titre, la catégorie et l'utilisateur associé
+   * sont modifiés. Le fichier PDF n'est pas remplacé.
+   */
   const handleEdit = async () => {
     if (
       !editingDocument?.title ||
@@ -201,10 +298,12 @@ export default function DocumentsPage() {
       });
 
       await fetchDocuments();
+
       setSuccess("Document updated successfully.");
       setEditingDocument(null);
     } catch (err) {
       console.error(err);
+
       setError(
         err?.response?.data?.message ||
           err?.response?.data?.error ||
@@ -215,6 +314,9 @@ export default function DocumentsPage() {
     }
   };
 
+  /**
+   * Supprime un document après confirmation.
+   */
   const handleDelete = async (documentId) => {
     const confirmDelete = window.confirm(
       "Are you sure you want to delete this document?"
@@ -229,10 +331,13 @@ export default function DocumentsPage() {
 
       const response = await deleteDocument(documentId);
 
+      // Mise à jour locale de la liste après suppression
       setDocuments((prev) => prev.filter((doc) => doc.id !== documentId));
+
       setSuccess(response.message || "Document deleted successfully.");
     } catch (err) {
       console.error(err);
+
       setError(
         err?.response?.data?.message ||
           err?.response?.data?.error ||
@@ -246,18 +351,21 @@ export default function DocumentsPage() {
   return (
     <AppLayout title="Documents">
       <div className="space-y-8">
+        {/* Message de succès */}
         {success && (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-emerald-700">
             {success}
           </div>
         )}
 
+        {/* Message d'erreur hors modale */}
         {error && !showUploadModal && !editingDocument && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-red-700">
             {error}
           </div>
         )}
 
+        {/* En-tête de la page */}
         <section className="overflow-hidden rounded-[32px] border border-slate-200 bg-white shadow-[0_12px_40px_rgba(15,23,42,0.08)]">
           <div className="bg-gradient-to-r from-[#12396b] via-blue-600 to-orange-500 px-6 py-8 md:px-8 md:py-10">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
@@ -277,6 +385,7 @@ export default function DocumentsPage() {
                 </p>
               </div>
 
+              {/* Bouton d'ajout visible uniquement pour les administrateurs */}
               {isAdmin && (
                 <button
                   onClick={openUploadModal}
@@ -289,6 +398,7 @@ export default function DocumentsPage() {
           </div>
         </section>
 
+        {/* Cartes statistiques */}
         <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
           <StatCard label="Total Documents" value={stats.total} tone="blue" icon="📁" />
           <StatCard label="Available" value={stats.available} tone="emerald" icon="✅" />
@@ -296,6 +406,7 @@ export default function DocumentsPage() {
           <StatCard label="Training Files" value={stats.training} tone="amber" icon="🎓" />
         </section>
 
+        {/* Zone de recherche et de filtre */}
         <section className="rounded-[30px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -308,6 +419,7 @@ export default function DocumentsPage() {
             </div>
 
             <div className="flex flex-col gap-3 sm:flex-row">
+              {/* Champ de recherche */}
               <input
                 type="text"
                 value={searchTerm}
@@ -316,6 +428,7 @@ export default function DocumentsPage() {
                 className="min-w-[260px] rounded-2xl border border-slate-300 px-4 py-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
               />
 
+              {/* Filtre par catégorie */}
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
@@ -332,6 +445,7 @@ export default function DocumentsPage() {
           </div>
         </section>
 
+        {/* Affichage du chargement ou des sections de documents */}
         {loading ? (
           <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 6 }).map((_, index) => (
@@ -348,6 +462,7 @@ export default function DocumentsPage() {
           </section>
         ) : isAdmin ? (
           <>
+            {/* Documents appartenant à l'utilisateur RH connecté */}
             <DocumentSection
               title="My HR Documents"
               description="Documents that belong to the connected HR user."
@@ -359,6 +474,7 @@ export default function DocumentsPage() {
               emptyText="No HR documents found."
             />
 
+            {/* Documents des collaborateurs */}
             <DocumentSection
               title="Collaborator Documents"
               description="Documents that belong to collaborators and are managed by HR."
@@ -371,6 +487,7 @@ export default function DocumentsPage() {
             />
           </>
         ) : (
+          // Documents visibles par un collaborateur
           <DocumentSection
             title="My Documents"
             description="Your personal HR documents."
@@ -384,6 +501,7 @@ export default function DocumentsPage() {
         )}
       </div>
 
+      {/* Modale d'ajout de document */}
       {showUploadModal && (
         <DocumentModal
           title="Upload Document"
@@ -401,6 +519,7 @@ export default function DocumentsPage() {
         />
       )}
 
+      {/* Modale de modification de document */}
       {editingDocument && (
         <DocumentModal
           title="Edit Document"
@@ -421,6 +540,9 @@ export default function DocumentsPage() {
   );
 }
 
+/**
+ * Modale réutilisable pour ajouter ou modifier un document.
+ */
 function DocumentModal({
   title,
   description,
@@ -438,18 +560,21 @@ function DocumentModal({
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
       <div className="w-full max-w-2xl rounded-[28px] bg-white shadow-2xl border border-slate-200 overflow-hidden">
+        {/* En-tête de la modale */}
         <div className="bg-gradient-to-r from-[#12396b] via-blue-600 to-orange-500 px-6 py-5">
           <h3 className="text-2xl font-bold text-white">{title}</h3>
           <p className="text-white/80 text-sm mt-1">{description}</p>
         </div>
 
         <div className="p-6 md:p-8 space-y-5">
+          {/* Message d'erreur dans la modale */}
           {error && (
             <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-red-700">
               {error}
             </div>
           )}
 
+          {/* Champ titre */}
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-2">
               Title *
@@ -465,7 +590,9 @@ function DocumentModal({
             />
           </div>
 
+          {/* Catégorie et utilisateur associé */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Sélection de catégorie */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Category *
@@ -485,6 +612,7 @@ function DocumentModal({
               </select>
             </div>
 
+            {/* Sélection de l'utilisateur propriétaire du document */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Employee / HR *
@@ -517,6 +645,7 @@ function DocumentModal({
             </div>
           </div>
 
+          {/* Champ fichier visible uniquement lors de l'ajout */}
           {showFileInput && (
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
@@ -537,6 +666,7 @@ function DocumentModal({
             </div>
           )}
 
+          {/* Boutons d'action */}
           <div className="flex justify-end gap-3 pt-2">
             <button
               onClick={onCancel}
@@ -560,6 +690,9 @@ function DocumentModal({
   );
 }
 
+/**
+ * Section affichant une liste de documents.
+ */
 function DocumentSection({
   title,
   description,
@@ -572,11 +705,13 @@ function DocumentSection({
 }) {
   return (
     <section className="space-y-5">
+      {/* Titre de la section */}
       <div>
         <h3 className="text-2xl font-bold text-slate-900">{title}</h3>
         <p className="mt-1 text-sm text-slate-500">{description}</p>
       </div>
 
+      {/* Liste des cartes documents */}
       <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
         {documents.length > 0 ? (
           documents.map((doc) => (
@@ -590,6 +725,7 @@ function DocumentSection({
             />
           ))
         ) : (
+          // Message si aucun document n'est trouvé
           <div className="col-span-full rounded-[28px] border border-slate-200 bg-white px-6 py-10 text-center shadow-sm">
             <p className="text-lg font-semibold text-slate-700">{emptyText}</p>
             <p className="mt-2 text-sm text-slate-500">
@@ -602,6 +738,9 @@ function DocumentSection({
   );
 }
 
+/**
+ * Carte statistique des documents.
+ */
 function StatCard({ label, value, tone = "blue", icon = "•" }) {
   const toneClasses = {
     blue: "from-blue-50 to-white border-blue-100 text-blue-700",
@@ -628,11 +767,24 @@ function StatCard({ label, value, tone = "blue", icon = "•" }) {
   );
 }
 
+/**
+ * Carte représentant un document.
+ *
+ * Elle affiche :
+ * - le titre ;
+ * - la catégorie ;
+ * - l'utilisateur associé ;
+ * - la date ;
+ * - le type et la taille ;
+ * - les actions disponibles.
+ */
 function DocumentCard({ document, isAdmin, onEdit, onDelete, deletingId }) {
+  // URL complète du fichier stocké côté backend
   const fileUrl = `http://127.0.0.1:8001${document.filePath}`;
 
   return (
     <div className="group rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(15,23,42,0.10)]">
+      {/* Icône et statut */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#12396b] to-orange-500 text-2xl text-white shadow-lg">
           📄
@@ -643,10 +795,12 @@ function DocumentCard({ document, isAdmin, onEdit, onDelete, deletingId }) {
         </span>
       </div>
 
+      {/* Titre du document */}
       <h4 className="mt-5 text-xl font-extrabold text-slate-900 transition group-hover:text-blue-700">
         {document.title}
       </h4>
 
+      {/* Informations du document */}
       <div className="mt-4 space-y-2 text-sm text-slate-500">
         <p>
           <span className="font-semibold text-slate-700">Category:</span>{" "}
@@ -676,6 +830,7 @@ function DocumentCard({ document, isAdmin, onEdit, onDelete, deletingId }) {
         </p>
       </div>
 
+      {/* Actions du document */}
       <div className="mt-6 flex flex-wrap gap-3">
         <a
           href={fileUrl}
@@ -694,6 +849,7 @@ function DocumentCard({ document, isAdmin, onEdit, onDelete, deletingId }) {
           Download
         </a>
 
+        {/* Actions réservées à l'administrateur/RH */}
         {isAdmin && (
           <>
             <button

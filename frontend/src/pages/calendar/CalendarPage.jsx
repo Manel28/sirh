@@ -16,8 +16,10 @@ import {
   XCircle,
 } from "lucide-react";
 
+// Codes disponibles pour renseigner une journée de travail
 const CODE_OPTIONS = ["", "SS", "TT", "TR", "AB"];
 
+// Liste des mois utilisée dans le sélecteur
 const MONTH_OPTIONS = [
   { value: "01", label: "January" },
   { value: "02", label: "February" },
@@ -33,10 +35,20 @@ const MONTH_OPTIONS = [
   { value: "12", label: "December" },
 ];
 
+/**
+ * Page principale du calendrier RH.
+ *
+ * Elle permet d'afficher le planning mensuel,
+ * de consulter les présences de l'équipe,
+ * de modifier son propre planning et de visualiser
+ * les statistiques du jour.
+ */
 export default function CalendarPage() {
+  // Récupération de l'utilisateur connecté
   const user = JSON.parse(localStorage.getItem("user") || "null");
   const currentUserId = user?.id;
 
+  // Initialisation du calendrier sur le mois courant
   const now = new Date();
   const currentYear = now.getFullYear();
 
@@ -44,20 +56,37 @@ export default function CalendarPage() {
     `${currentYear}-${String(now.getMonth() + 1).padStart(2, "0")}`
   );
 
+  // Génération d'une grande liste d'années à partir de 2026
   const yearOptions = Array.from(
-  { length: 1000 },
-  (_, index) => 2026 + index
-);
+    { length: 1000 },
+    (_, index) => 2026 + index
+  );
+
+  // Séparation du mois sélectionné en année et mois
   const selectedYear = month.split("-")[0];
   const selectedMonth = month.split("-")[1];
 
+  // Liste des collaborateurs
   const [employees, setEmployees] = useState([]);
+
+  // Entrées du calendrier récupérées depuis l'API
   const [entries, setEntries] = useState([]);
+
+  // Gestion des états d'affichage
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState("");
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
 
+  /**
+   * Génère tous les jours du mois sélectionné.
+   *
+   * Chaque jour contient :
+   * - son numéro ;
+   * - sa date complète ;
+   * - son nom abrégé ;
+   * - une indication week-end.
+   */
   const days = useMemo(() => {
     const [y, m] = month.split("-").map(Number);
     const count = new Date(y, m, 0).getDate();
@@ -75,6 +104,13 @@ export default function CalendarPage() {
     });
   }, [month]);
 
+  /**
+   * Charge les données nécessaires au calendrier.
+   *
+   * Deux appels API sont exécutés en parallèle :
+   * - récupération des entrées du mois ;
+   * - récupération des collaborateurs.
+   */
   const loadData = async () => {
     try {
       setLoading(true);
@@ -85,8 +121,10 @@ export default function CalendarPage() {
         getCollaborators(),
       ]);
 
+      // Stockage des entrées du calendrier
       setEntries(Array.isArray(entriesData) ? entriesData : []);
 
+      // Exclusion des administrateurs de la liste des collaborateurs affichés
       const collaborators = (Array.isArray(usersData) ? usersData : []).filter(
         (item) => !item.roles?.includes("ROLE_ADMIN")
       );
@@ -100,20 +138,36 @@ export default function CalendarPage() {
     }
   };
 
+  /**
+   * Recharge automatiquement le calendrier
+   * quand l'utilisateur ou le mois sélectionné change.
+   */
   useEffect(() => {
     if (currentUserId) {
       loadData();
     }
   }, [month, currentUserId]);
 
+  /**
+   * Transforme les entrées en objet clé/valeur.
+   *
+   * Cela permet de retrouver rapidement le code
+   * d'un collaborateur pour une date donnée.
+   */
   const entriesMap = useMemo(() => {
     const map = {};
+
     entries.forEach((entry) => {
       map[`${entry.userId}_${entry.date}`] = entry.code;
     });
+
     return map;
   }, [entries]);
 
+  /**
+   * Prépare les informations de l'utilisateur connecté
+   * pour afficher son propre calendrier.
+   */
   const currentUser = useMemo(() => {
     return {
       id: user?.id,
@@ -123,8 +177,17 @@ export default function CalendarPage() {
     };
   }, [user]);
 
+  /**
+   * Filtre les collaborateurs selon la recherche.
+   *
+   * La recherche fonctionne sur :
+   * - prénom ;
+   * - nom ;
+   * - email.
+   */
   const filteredEmployees = useMemo(() => {
     const query = search.trim().toLowerCase();
+
     if (!query) return employees;
 
     return employees.filter((employee) => {
@@ -139,8 +202,19 @@ export default function CalendarPage() {
     });
   }, [employees, search]);
 
+  /**
+   * Calcule les statistiques du jour.
+   *
+   * Les statistiques sont calculées à partir des codes :
+   * SS = sur site
+   * TT = télétravail
+   * TR = formation
+   * AB = absence
+   * LV = congé
+   */
   const stats = useMemo(() => {
     const today = new Date();
+
     const todayString = `${today.getFullYear()}-${String(
       today.getMonth() + 1
     ).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
@@ -171,24 +245,36 @@ export default function CalendarPage() {
     };
   }, [filteredEmployees, entriesMap]);
 
+  // Change uniquement le mois tout en gardant l'année sélectionnée
   const handleMonthChange = (newMonth) => {
     setMonth(`${selectedYear}-${newMonth}`);
   };
 
+  // Change uniquement l'année tout en gardant le mois sélectionné
   const handleYearChange = (newYear) => {
     setMonth(`${newYear}-${selectedMonth}`);
   };
 
+  /**
+   * Enregistre une modification du calendrier.
+   *
+   * La modification concerne uniquement les cellules autorisées,
+   * c'est-à-dire les jours ouvrés de l'utilisateur connecté.
+   */
   const handleChange = async (userId, date, code) => {
     try {
       const key = `${userId}_${date}`;
+
       setSaving(key);
       setError("");
 
       await saveWorkEntry({ userId, date, code });
+
+      // Recharge les données après sauvegarde
       await loadData();
     } catch (err) {
       console.error(err);
+
       setError(
         err?.response?.data?.message ||
           err?.response?.data?.error ||
@@ -202,6 +288,7 @@ export default function CalendarPage() {
   return (
     <AppLayout title="Calendar">
       <div className="space-y-7">
+        {/* En-tête visuel de la page calendrier */}
         <section className="relative overflow-hidden rounded-[32px] border border-white/40 bg-gradient-to-r from-[#12396b] via-blue-600 to-orange-500 shadow-[0_20px_60px_rgba(18,57,107,0.18)]">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.28),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.22),transparent_28%)]" />
 
@@ -223,6 +310,7 @@ export default function CalendarPage() {
                 </p>
               </div>
 
+              {/* Sélecteurs du mois et de l'année */}
               <div className="rounded-3xl border border-white/20 bg-white/15 p-4 backdrop-blur-xl shadow-xl">
                 <label className="mb-2 block text-xs font-bold uppercase tracking-wide text-white/70">
                   Selected month
@@ -258,12 +346,14 @@ export default function CalendarPage() {
           </div>
         </section>
 
+        {/* Message d'erreur */}
         {error && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-sm font-semibold text-red-700">
             {error}
           </div>
         )}
 
+        {/* Statistiques du jour */}
         <section className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
           <TopStat label="Employees" value={stats.total} icon={Users} />
           <TopStat label="On Site" value={stats.ss} icon={CheckCircle2} />
@@ -273,6 +363,7 @@ export default function CalendarPage() {
           <TopStat label="Leave" value={stats.lv} icon={Clock3} />
         </section>
 
+        {/* Légende des codes du calendrier */}
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -295,6 +386,7 @@ export default function CalendarPage() {
           </div>
         </section>
 
+        {/* Calendrier personnel de l'utilisateur connecté */}
         <CalendarTable
           title="My Calendar"
           subtitle="You can edit your own work days. Weekends and approved leave are locked."
@@ -308,6 +400,7 @@ export default function CalendarPage() {
           loading={loading}
         />
 
+        {/* Zone de recherche pour le planning de l'équipe */}
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -335,6 +428,7 @@ export default function CalendarPage() {
           </div>
         </section>
 
+        {/* Planning global de l'équipe, non modifiable */}
         <CalendarTable
           title=""
           subtitle=""
@@ -352,6 +446,12 @@ export default function CalendarPage() {
   );
 }
 
+/**
+ * Tableau réutilisable du calendrier.
+ *
+ * Il affiche une ligne par collaborateur
+ * et une colonne par jour du mois.
+ */
 function CalendarTable({
   title,
   subtitle,
@@ -366,6 +466,7 @@ function CalendarTable({
 }) {
   return (
     <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
+      {/* Titre optionnel du tableau */}
       {(title || subtitle) && (
         <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-orange-50/40 px-6 py-5">
           {title && (
@@ -375,6 +476,7 @@ function CalendarTable({
         </div>
       )}
 
+      {/* Tableau avec défilement horizontal */}
       <div className="overflow-auto">
         <table className="min-w-full border-collapse text-sm">
           <thead>
@@ -383,6 +485,7 @@ function CalendarTable({
                 Collaborator
               </th>
 
+              {/* Affichage des jours du mois */}
               {days.map((day) => (
                 <th
                   key={day.date}
@@ -402,6 +505,7 @@ function CalendarTable({
           </thead>
 
           <tbody>
+            {/* État de chargement */}
             {loading ? (
               <tr>
                 <td
@@ -414,6 +518,7 @@ function CalendarTable({
             ) : employees.length > 0 ? (
               employees.map((employee) => (
                 <tr key={employee.id} className="transition hover:bg-blue-50/30">
+                  {/* Informations du collaborateur */}
                   <td className="sticky left-0 z-10 min-w-[240px] border-b border-r border-slate-100 bg-white p-4">
                     <div className="font-bold text-slate-900">
                       {[employee.firstName, employee.lastName]
@@ -425,11 +530,17 @@ function CalendarTable({
                     </div>
                   </td>
 
+                  {/* Cellules du calendrier */}
                   {days.map((day) => {
                     const key = `${employee.id}_${day.date}`;
+
+                    // Code enregistré pour ce jour, ou WK si week-end
                     const code = entriesMap[key] || (day.isWeekend ? "WK" : "");
+
+                    // Vérifie si cette cellule est en cours de sauvegarde
                     const isSaving = saving === key;
 
+                    // Seul l'utilisateur connecté peut modifier ses jours ouvrés
                     const canEdit =
                       isEditable &&
                       Number(employee.id) === Number(currentUserId) &&
@@ -444,6 +555,7 @@ function CalendarTable({
                         }`}
                       >
                         {canEdit ? (
+                          // Cellule modifiable sous forme de liste déroulante
                           <select
                             value={code}
                             onChange={(e) =>
@@ -461,6 +573,7 @@ function CalendarTable({
                             ))}
                           </select>
                         ) : (
+                          // Cellule non modifiable
                           <div
                             className={`rounded-xl border px-2 py-2 text-xs font-black ${getCellClass(
                               code
@@ -475,6 +588,7 @@ function CalendarTable({
                 </tr>
               ))
             ) : (
+              // Message si aucun collaborateur n'est disponible
               <tr>
                 <td
                   colSpan={days.length + 1}
@@ -491,6 +605,9 @@ function CalendarTable({
   );
 }
 
+/**
+ * Carte affichant une statistique du calendrier.
+ */
 function TopStat({ label, value, icon: Icon }) {
   return (
     <div className="group relative overflow-hidden rounded-3xl border border-white/40 bg-white/85 p-5 shadow-[0_10px_40px_rgba(15,23,42,0.08)] backdrop-blur-xl transition duration-300 hover:-translate-y-1 hover:shadow-[0_20px_50px_rgba(18,57,107,0.15)]">
@@ -510,6 +627,9 @@ function TopStat({ label, value, icon: Icon }) {
   );
 }
 
+/**
+ * Élément de légende pour expliquer les codes du calendrier.
+ */
 function Legend({ code, label, className }) {
   return (
     <div
@@ -521,6 +641,9 @@ function Legend({ code, label, className }) {
   );
 }
 
+/**
+ * Retourne le style CSS correspondant au code de présence.
+ */
 function getCellClass(code) {
   switch (code) {
     case "SS":
