@@ -2,7 +2,7 @@
 import axios from "axios";
 
 // URL de base de l'API backend
-const API_BASE_URL = "http://127.0.0.1:8001/api";
+const API_BASE_URL = "https://sirh-723w.onrender.com/api";
 
 /**
  * Récupère l'utilisateur connecté depuis le localStorage.
