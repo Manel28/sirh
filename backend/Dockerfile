@@ -22,6 +22,8 @@ RUN mkdir -p public/uploads/documents \
     && chown -R www-data:www-data public/uploads \
     && chmod -R 775 public/uploads
 
+RUN chmod +x docker-entrypoint.sh
+
 RUN a2enmod rewrite
 
 RUN sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html/public|g' /etc/apache2/sites-available/000-default.conf
@@ -34,3 +36,5 @@ RUN printf '<Directory /var/www/html/public>\n\
     && a2enconf symfony
 
 EXPOSE 80
+
+CMD ["./docker-entrypoint.sh"]
