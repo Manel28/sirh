@@ -1,8 +1,8 @@
 // Import de la bibliothèque Axios utilisée pour effectuer les appels HTTP vers l'API Symfony
 import axios from "axios";
+import { API_BASE_URL } from "./apiConfig";
 
 // URL de base de l'API backend
-const API_BASE_URL = "https://sirh-723w.onrender.com/api";
 
 /**
  * Récupère l'utilisateur connecté depuis le localStorage.

@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 
 // Import d'Axios pour effectuer les requêtes HTTP vers l'API Symfony
 import axios from "axios";
+import { API_BASE_URL } from "../../services/apiConfig";
 
 // Import des icônes utilisées pour afficher ou masquer le mot de passe
 import { Eye, EyeOff } from "lucide-react";
@@ -116,7 +117,7 @@ export default function ChangePasswordPage() {
 
       // Envoi de la requête à l'API Symfony
       const response = await axios.post(
-        "http://127.0.0.1:8001/api/change-password",
+        `${API_BASE_URL}/change-password`,
         {
           userId: user.id,
           newPassword: form.newPassword,

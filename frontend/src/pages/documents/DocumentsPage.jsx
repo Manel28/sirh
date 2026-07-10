@@ -14,6 +14,7 @@ import {
   updateDocument,
   uploadDocument,
 } from "../../services/documentService";
+import { buildBackendUrl } from "../../services/apiConfig";
 
 // Catégories disponibles pour classer les documents RH
 const CATEGORIES = [
@@ -780,7 +781,7 @@ function StatCard({ label, value, tone = "blue", icon = "•" }) {
  */
 function DocumentCard({ document, isAdmin, onEdit, onDelete, deletingId }) {
   // URL complète du fichier stocké côté backend
-  const fileUrl = `http://127.0.0.1:8001${document.filePath}`;
+  const fileUrl = buildBackendUrl(document.filePath);
 
   return (
     <div className="group rounded-[28px] border border-slate-200 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.05)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_40px_rgba(15,23,42,0.10)]">

@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 
 // Import d'Axios pour envoyer les requêtes HTTP vers l'API Symfony
 import axios from "axios";
+import { API_BASE_URL } from "../../services/apiConfig";
 
 // Import des icônes utilisées pour afficher ou masquer le mot de passe
 import { Eye, EyeOff } from "lucide-react";
@@ -74,7 +75,7 @@ export default function LoginPage() {
       setError("");
 
       // Envoi des identifiants à l'API Symfony
-      const response = await axios.post("http://127.0.0.1:8001/api/login", {
+      const response = await axios.post(`${API_BASE_URL}/login`, {
         email: form.email,
         password: form.password,
       });

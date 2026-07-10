@@ -1,9 +1,10 @@
 // Import de la bibliothèque Axios utilisée pour effectuer les appels HTTP vers l'API Symfony
 import axios from "axios";
+import { API_BASE_URL } from "./apiConfig";
 
 // URL de l'endpoint de connexion
 // Cette route reçoit l'email et le mot de passe de l'utilisateur
-const API_URL = "http://127.0.0.1:8001/api/login";
+const API_URL = `${API_BASE_URL}/login`;
 
 /**
  * Fonction permettant d'authentifier un utilisateur.

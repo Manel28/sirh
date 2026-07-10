@@ -6,11 +6,21 @@ RUN apt-get update && apt-get install -y \
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
+ENV COMPOSER_MAX_PARALLEL_HTTP=1 \
+    COMPOSER_PROCESS_TIMEOUT=2000
+
 WORKDIR /var/www/html
 
 COPY . .
 
-RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+RUN set -eux; \
+    composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader \
+    || composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader \
+    || composer install --no-dev --prefer-source --no-interaction --optimize-autoloader
+
+RUN mkdir -p public/uploads/documents \
+    && chown -R www-data:www-data public/uploads \
+    && chmod -R 775 public/uploads
 
 RUN a2enmod rewrite
 
