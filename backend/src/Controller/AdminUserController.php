@@ -68,7 +68,6 @@ class AdminUserController
         try {
             // Décodage du JSON reçu depuis le frontend
             $data = json_decode($request->getContent(), true);
-
             // Vérification des champs obligatoires
             if (
                 !$data ||
@@ -80,18 +79,14 @@ class AdminUserController
             ) {
                 return new JsonResponse(['message' => 'Missing required fields'], 400);
             }
-
             // Nettoyage et normalisation de l'adresse email
             $email = strtolower(trim($data['email']));
-
             // Vérification de l'unicité de l'email
             if ($userRepository->findOneBy(['email' => $email])) {
                 return new JsonResponse(['message' => 'A user with this email already exists'], 409);
             }
-
             // Génération d'un mot de passe temporaire sécurisé
             $temporaryPassword = $this->generateStrongPassword();
-
             // Création de l'entité utilisateur
             $user = new User();
             $user->setFirstName(trim($data['firstName']));

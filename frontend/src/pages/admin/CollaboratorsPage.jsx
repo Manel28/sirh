@@ -152,27 +152,21 @@ export default function CollaboratorsPage() {
   const handleSubmit = async (e) => {
     // Empêche le rechargement automatique de la page
     e.preventDefault();
-
     try {
       // Active l'état d'envoi
       setSubmitting(true);
-
       // Réinitialise les messages
       setMessage("");
       setError("");
-
       // Envoie les données du formulaire à l'API
       const response = await createCollaborator(form);
-
       // Affiche le message de succès
       setMessage(
         response.message ||
           "Collaborator created successfully. An email has been sent."
       );
-
       // Vide le formulaire
       resetForm();
-
       // Recharge la liste des collaborateurs
       await fetchCollaborators();
     } catch (err) {

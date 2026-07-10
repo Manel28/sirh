@@ -14,7 +14,7 @@ class LeaveRepository extends ServiceEntityRepository
         parent::__construct($registry, Leave::class);
     }
 
-    public function hasOverlappingLeave(
+    public function hasOverlappingLeave(            
         User $user,
         \DateTimeInterface $startDate,
         \DateTimeInterface $endDate
