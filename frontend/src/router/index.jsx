@@ -47,7 +47,11 @@ export const router = createBrowserRouter([
    */
   {
     path: "/change-password",
-    element: <ChangePasswordPage />,
+    element: (
+      <ProtectedRoute>
+        <ChangePasswordPage />
+      </ProtectedRoute>
+    ),
   },
 
   /**

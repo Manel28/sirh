@@ -6,7 +6,9 @@ RUN apt-get update && apt-get install -y \
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
-ENV COMPOSER_MAX_PARALLEL_HTTP=1 \
+ENV APP_ENV=prod \
+    APP_DEBUG=0 \
+    COMPOSER_MAX_PARALLEL_HTTP=1 \
     COMPOSER_PROCESS_TIMEOUT=2000
 
 WORKDIR /var/www/html
@@ -22,7 +24,8 @@ RUN mkdir -p public/uploads/documents \
     && chown -R www-data:www-data public/uploads \
     && chmod -R 775 public/uploads
 
-RUN chmod +x docker-entrypoint.sh
+RUN sed -i 's/\r$//' docker-entrypoint.sh \
+    && chmod +x docker-entrypoint.sh
 
 RUN a2enmod rewrite
 
@@ -31,6 +34,7 @@ RUN sed -i 's|DocumentRoot /var/www/html|DocumentRoot /var/www/html/public|g' /e
 RUN printf '<Directory /var/www/html/public>\n\
     AllowOverride All\n\
     Require all granted\n\
+    SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1\n\
     FallbackResource /index.php\n\
 </Directory>\n' > /etc/apache2/conf-available/symfony.conf \
     && a2enconf symfony

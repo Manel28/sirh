@@ -1,5 +1,5 @@
 // Import des hooks React pour gérer les effets, les états et les calculs optimisés
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 // Import du layout principal utilisé pour les pages connectées
 import AppLayout from "../../layouts/AppLayout";
@@ -47,7 +47,7 @@ export default function NotificationsPage() {
   /**
    * Récupère les notifications de l'utilisateur connecté.
    */
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     try {
       // Active l'état de chargement
       setLoading(true);
@@ -62,7 +62,7 @@ export default function NotificationsPage() {
       }
 
       // Appel API pour récupérer les notifications de l'utilisateur
-      const data = await getNotifications(user.id);
+      const data = await getNotifications();
 
       // Vérifie que la réponse est bien un tableau
       setNotifications(Array.isArray(data) ? data : []);
@@ -76,14 +76,14 @@ export default function NotificationsPage() {
       // Désactive le chargement dans tous les cas
       setLoading(false);
     }
-  };
+  }, [user?.id]);
 
   /**
    * Charge les notifications lors de l'ouverture de la page.
    */
   useEffect(() => {
     fetchNotifications();
-  }, []);
+  }, [fetchNotifications]);
 
   /**
    * Marque une notification comme lue.
@@ -116,7 +116,7 @@ export default function NotificationsPage() {
       if (!user?.id) return;
 
       // Appel API pour marquer toutes les notifications comme lues
-      await markAllNotificationsAsRead(user.id);
+      await markAllNotificationsAsRead();
 
       // Mise à jour locale de toutes les notifications
       setNotifications((prev) =>
@@ -231,9 +231,9 @@ export default function NotificationsPage() {
  * Retourne une icône selon le type de notification.
  *
  * Types gérés :
- * - leave : congé 
- * - document : document 
- * - calendar : calendrier 
+ * - leave : congé
+ * - document : document
+ * - calendar : calendrier
  * - default : notification générale
  */
 function getNotificationIcon(type) {

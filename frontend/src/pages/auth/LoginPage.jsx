@@ -5,8 +5,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Import d'Axios pour envoyer les requêtes HTTP vers l'API Symfony
-import axios from "axios";
-import { API_BASE_URL } from "../../services/apiConfig";
+import { loginUser } from "../../services/authService";
 
 // Import des icônes utilisées pour afficher ou masquer le mot de passe
 import { Eye, EyeOff } from "lucide-react";
@@ -15,10 +14,10 @@ import { Eye, EyeOff } from "lucide-react";
  * Page de connexion de l'application.
  *
  * Cette page permet à l'utilisateur de :
- * - saisir son email et son mot de passe 
- * - envoyer ses identifiants à l'API 
- * - stocker les informations utilisateur dans le localStorage 
- * - être redirigé vers le changement de mot de passe si nécessaire 
+ * - saisir son email et son mot de passe
+ * - envoyer ses identifiants à l'API
+ * - stocker les informations utilisateur dans le localStorage
+ * - être redirigé vers le changement de mot de passe si nécessaire
  * - accéder au tableau de bord après authentification
  */
 export default function LoginPage() {
@@ -75,19 +74,24 @@ export default function LoginPage() {
       setError("");
 
       // Envoi des identifiants à l'API Symfony
-      const response = await axios.post(`${API_BASE_URL}/login`, {
+      const response = await loginUser({
         email: form.email,
         password: form.password,
       });
 
       // Récupération de l'utilisateur retourné par l'API
-      const user = response.data.user;
+      const user = response.user;
+
+      if (!response.token || !user) {
+        throw new Error("Invalid authentication response.");
+      }
 
       // Stockage de l'utilisateur connecté dans le navigateur
+      localStorage.setItem("token", response.token);
       localStorage.setItem("user", JSON.stringify(user));
 
       // Si le mot de passe temporaire doit être changé, redirection vers la page dédiée
-      if (response.data.mustChangePassword || user.mustChangePassword) {
+      if (response.mustChangePassword || user.mustChangePassword) {
         navigate("/change-password");
       } else {
         // Sinon, l'utilisateur accède directement au tableau de bord

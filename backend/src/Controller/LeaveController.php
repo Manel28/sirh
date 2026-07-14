@@ -4,179 +4,116 @@ namespace App\Controller;
 
 use App\Entity\Leave;
 use App\Entity\Notification;
+use App\Entity\User;
 use App\Repository\LeaveRepository;
 use App\Repository\UserRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
-/**
- * Contrôleur dédié à la gestion des congés.
- *
- * Il permet :
- * - de consulter les demandes de congé 
- * - de créer une demande 
- * - d'approuver, refuser ou annuler une demande 
- * - de calculer les jours ouvrés 
- * - de gérer les notifications liées aux congés
- */
 class LeaveController
 {
-    /**
-     * Retourne les demandes de congé.
-     *
-     * Administrateur :
-     * - voit toutes les demandes.
-     *
-     * Collaborateur :
-     * - voit uniquement ses demandes.
-     */
+    private const LEAVE_TYPES = [
+        'Paid Leave',
+        'Unpaid Leave',
+        'Special Event Leave',
+        'JNT',
+        'Sick Leave',
+        'Half-day Morning',
+        'Half-day Afternoon',
+        'Other Absence',
+    ];
+
     #[Route('/api/leaves', methods: ['GET'])]
     public function getLeaves(
-        Request $request,
-        LeaveRepository $leaveRepository,
-        UserRepository $userRepository
+        #[CurrentUser] User $user,
+        LeaveRepository $leaveRepository
     ): JsonResponse {
-        try {
-            // Récupération de l'utilisateur et de ses rôles
-            $userId = $request->query->get('userId');
-            $roles = $request->query->all('roles');
+        $leaves = in_array('ROLE_ADMIN', $user->getRoles(), true)
+            ? $leaveRepository->findBy([], ['id' => 'DESC'])
+            : $leaveRepository->findBy(['user' => $user], ['id' => 'DESC']);
 
-            if (!$userId) {
-                return new JsonResponse(['message' => 'Missing user.'], 400);
-            }
-
-            // Recherche de l'utilisateur
-            $user = $userRepository->find($userId);
-
-            if (!$user) {
-                return new JsonResponse(['message' => 'User not found.'], 404);
-            }
-
-            // Vérifie si l'utilisateur est administrateur
-            $isAdmin = in_array('ROLE_ADMIN', $roles, true);
-
-            // Chargement des demandes selon le rôle
-            $leaves = $isAdmin
-                ? $leaveRepository->findBy([], ['id' => 'DESC'])
-                : $leaveRepository->findBy(['user' => $user], ['id' => 'DESC']);
-
-            return new JsonResponse([
-                'leaveBalance' => $user->getLeaveBalance(),
-
-                // Formatage des demandes pour le frontend
-                'leaves' => array_map(
-                    fn(Leave $leave) => $this->formatLeave($leave),
-                    $leaves
-                ),
-            ], 200);
-        } catch (\Throwable $e) {
-            return new JsonResponse([
-                'message' => 'Server error while loading leave requests.',
-                'error' => $e->getMessage(),
-                'line' => $e->getLine(),
-            ], 500);
-        }
+        return new JsonResponse([
+            'leaveBalance' => $user->getLeaveBalance(),
+            'leaves' => array_map(
+                fn (Leave $leave) => $this->formatLeave($leave),
+                $leaves
+            ),
+        ]);
     }
 
-    /**
-     * Crée une nouvelle demande de congé.
-     */
     #[Route('/api/leaves', methods: ['POST'])]
     public function createLeave(
+        #[CurrentUser] User $user,
         Request $request,
         EntityManagerInterface $entityManager,
         UserRepository $userRepository,
         LeaveRepository $leaveRepository
     ): JsonResponse {
         try {
-            // Récupération des données envoyées par React
             $data = json_decode($request->getContent(), true);
+            $type = is_array($data) ? (string) ($data['type'] ?? '') : '';
+            $start = is_array($data) ? (string) ($data['start'] ?? '') : '';
+            $end = is_array($data) ? (string) ($data['end'] ?? '') : '';
 
-            $type = $data['type'] ?? null;
-            $start = $data['start'] ?? null;
-            $end = $data['end'] ?? null;
-            $userId = $data['userId'] ?? null;
-
-            // Vérification des champs obligatoires
-            if (!$type || !$start || !$end || !$userId) {
+            if ($type === '' || $start === '' || $end === '') {
                 return new JsonResponse(['message' => 'Missing required fields.'], 400);
             }
 
-            // Recherche du collaborateur
-            $user = $userRepository->find($userId);
-
-            if (!$user) {
-                return new JsonResponse(['message' => 'User not found.'], 404);
+            if (!in_array($type, self::LEAVE_TYPES, true)) {
+                return new JsonResponse(['message' => 'Invalid leave type.'], 400);
             }
 
-            // Conversion des dates
-            $startDate = new \DateTime($start);
-            $endDate = new \DateTime($end);
+            $startDate = \DateTime::createFromFormat('!Y-m-d', $start);
+            $endDate = \DateTime::createFromFormat('!Y-m-d', $end);
+
+            if (
+                !$startDate || !$endDate ||
+                $startDate->format('Y-m-d') !== $start ||
+                $endDate->format('Y-m-d') !== $end
+            ) {
+                return new JsonResponse(['message' => 'Invalid date format.'], 400);
+            }
+
             $today = new \DateTime('today');
 
-            // Vérification des dates passées
             if ($startDate < $today || $endDate < $today) {
-                return new JsonResponse([
-                    'message' => 'The selected date cannot be in the past.'
-                ], 400);
+                return new JsonResponse(['message' => 'The selected date cannot be in the past.'], 400);
             }
 
-            // Vérifie la cohérence des dates
             if ($endDate < $startDate) {
-                return new JsonResponse([
-                    'message' => 'End date cannot be earlier than start date.'
-                ], 400);
+                return new JsonResponse(['message' => 'End date cannot be earlier than start date.'], 400);
             }
 
-            // Vérifie qu'il n'existe pas déjà une demande sur la même période
-            if ($leaveRepository->hasOverlappingLeave(
-                $user,
-                $startDate,
-                $endDate
-            )) {
+            if ($leaveRepository->hasOverlappingLeave($user, $startDate, $endDate)) {
                 return new JsonResponse([
-                    'message' => 'You already have a leave request for this period.'
-                ], 400);
+                    'message' => 'You already have a leave request for this period.',
+                ], 409);
             }
 
-            // Calcul du nombre de jours ouvrés
-            $requestedDays = $this->countWorkingDays(
-                $startDate,
-                $endDate
-            );
+            $requestedDays = $this->countWorkingDays($startDate, $endDate);
 
             if ($requestedDays <= 0) {
                 return new JsonResponse([
-                    'message' => 'The leave request must include at least one working day.'
+                    'message' => 'The leave request must include at least one working day.',
                 ], 400);
             }
 
-            // Vérifie le solde de congés payés
-            if (
-                $type === 'Paid Leave' &&
-                $user->getLeaveBalance() < $requestedDays
-            ) {
-                return new JsonResponse([
-                    'message' => 'Insufficient leave balance.'
-                ], 400);
+            if ($type === 'Paid Leave' && $user->getLeaveBalance() < $requestedDays) {
+                return new JsonResponse(['message' => 'Insufficient leave balance.'], 400);
             }
 
-            // Création de la demande
-            $leave = new Leave();
-            $leave->setType($type);
-            $leave->setStartDate($startDate);
-            $leave->setEndDate($endDate);
-            $leave->setStatus('Pending');
-            $leave->setUser($user);
+            $leave = (new Leave())
+                ->setType($type)
+                ->setStartDate($startDate)
+                ->setEndDate($endDate)
+                ->setStatus('Pending')
+                ->setUser($user);
 
             $entityManager->persist($leave);
 
-            /**
-             * Notification envoyée aux administrateurs RH
-             * lorsqu'un collaborateur crée une demande.
-             */
             $admins = $userRepository->createQueryBuilder('u')
                 ->where('u.roles LIKE :role')
                 ->setParameter('role', '%ROLE_ADMIN%')
@@ -190,20 +127,16 @@ class LeaveController
                     'New leave request',
                     sprintf(
                         '%s submitted a new %s request from %s to %s.',
-                        trim(
-                            ($user->getFirstName() ?? '') .
-                            ' ' .
-                            ($user->getLastName() ?? '')
-                        ) ?: $user->getEmail(),
+                        trim(($user->getFirstName() ?? '') . ' ' . ($user->getLastName() ?? ''))
+                            ?: $user->getEmail(),
                         $type,
-                        $startDate->format('Y-m-d'),
-                        $endDate->format('Y-m-d')
+                        $start,
+                        $end
                     ),
                     'leave'
                 );
             }
 
-            // Sauvegarde en base
             $entityManager->flush();
 
             return new JsonResponse([
@@ -211,102 +144,77 @@ class LeaveController
                 'leave' => $this->formatLeave($leave),
                 'leaveBalance' => $user->getLeaveBalance(),
             ], 201);
-        } catch (\Throwable $e) {
-            return new JsonResponse([
-                'message' => 'Server error while creating leave request.',
-                'error' => $e->getMessage(),
-                'line' => $e->getLine(),
-            ], 500);
+        } catch (\Throwable) {
+            return new JsonResponse(['message' => 'Server error while creating leave request.'], 500);
         }
     }
 
-    /**
-     * Modifie le statut d'une demande.
-     *
-     * Statuts possibles :
-     * - Approved
-     * - Rejected
-     * - Cancelled
-     */
     #[Route('/api/leaves/{id}/status', methods: ['PATCH'])]
     public function updateLeaveStatus(
         int $id,
+        #[CurrentUser] User $currentUser,
         Request $request,
         LeaveRepository $leaveRepository,
         EntityManagerInterface $entityManager
     ): JsonResponse {
         try {
-            // Recherche de la demande
             $leave = $leaveRepository->find($id);
 
             if (!$leave) {
-                return new JsonResponse([
-                    'message' => 'Leave request not found.'
-                ], 404);
+                return new JsonResponse(['message' => 'Leave request not found.'], 404);
             }
 
             $data = json_decode($request->getContent(), true);
-            $newStatus = $data['status'] ?? null;
+            $newStatus = is_array($data) ? ($data['status'] ?? null) : null;
 
-            // Vérification du statut demandé
-            if (!in_array(
-                $newStatus,
-                ['Approved', 'Rejected', 'Cancelled'],
-                true
-            )) {
-                return new JsonResponse([
-                    'message' => 'Invalid status.'
-                ], 400);
+            if (!in_array($newStatus, ['Approved', 'Rejected', 'Cancelled'], true)) {
+                return new JsonResponse(['message' => 'Invalid status.'], 400);
             }
 
-            // Une demande déjà traitée ne peut plus être modifiée
             if ($leave->getStatus() !== 'Pending') {
-                return new JsonResponse([
-                    'message' => 'This request has already been processed.'
-                ], 400);
+                return new JsonResponse(['message' => 'This request has already been processed.'], 409);
             }
 
-            $user = $leave->getUser();
+            $owner = $leave->getUser();
 
-            if (!$user) {
-                return new JsonResponse([
-                    'message' => 'Leave request user not found.'
-                ], 404);
+            if (!$owner) {
+                return new JsonResponse(['message' => 'Leave request user not found.'], 404);
             }
 
-            /**
-             * Déduction du solde de congés
-             * uniquement lors de l'approbation.
-             */
+            $isAdmin = in_array('ROLE_ADMIN', $currentUser->getRoles(), true);
+
+            if (in_array($newStatus, ['Approved', 'Rejected'], true) && !$isAdmin) {
+                return new JsonResponse(['message' => 'Administrator access required.'], 403);
+            }
+
             if (
-                $newStatus === 'Approved' &&
-                $leave->getType() === 'Paid Leave'
+                $newStatus === 'Cancelled' &&
+                !$isAdmin &&
+                $owner->getId() !== $currentUser->getId()
             ) {
+                return new JsonResponse(['message' => 'You cannot cancel this request.'], 403);
+            }
+
+            if ($newStatus === 'Approved' && $leave->getType() === 'Paid Leave') {
                 $requestedDays = $this->countWorkingDays(
                     $leave->getStartDate(),
                     $leave->getEndDate()
                 );
 
-                if ($user->getLeaveBalance() < $requestedDays) {
+                if ($owner->getLeaveBalance() < $requestedDays) {
                     return new JsonResponse([
                         'message' => 'Insufficient leave balance to approve this request.',
                     ], 400);
                 }
 
-                $user->setLeaveBalance(
-                    $user->getLeaveBalance() - $requestedDays
-                );
+                $owner->setLeaveBalance($owner->getLeaveBalance() - $requestedDays);
             }
 
-            // Mise à jour du statut
             $leave->setStatus($newStatus);
 
-            /**
-             * Notification envoyée au collaborateur.
-             */
             $this->createNotification(
                 $entityManager,
-                $user,
+                $owner,
                 'Leave request updated',
                 sprintf(
                     'Your %s request from %s to %s has been %s.',
@@ -323,51 +231,37 @@ class LeaveController
             return new JsonResponse([
                 'message' => 'Leave request status updated successfully.',
                 'leave' => $this->formatLeave($leave),
-                'leaveBalance' => $user->getLeaveBalance(),
-            ], 200);
-        } catch (\Throwable $e) {
-            return new JsonResponse([
-                'message' => 'Server error while updating leave status.',
-                'error' => $e->getMessage(),
-                'line' => $e->getLine(),
-            ], 500);
+                'leaveBalance' => $owner->getLeaveBalance(),
+            ]);
+        } catch (\Throwable) {
+            return new JsonResponse(['message' => 'Server error while updating leave status.'], 500);
         }
     }
 
-    /**
-     * Crée une notification utilisateur.
-     */
     private function createNotification(
         EntityManagerInterface $entityManager,
-        $user,
+        User $user,
         string $title,
         string $message,
         string $type
     ): void {
-        $notification = new Notification();
-
-        $notification->setUser($user);
-        $notification->setTitle($title);
-        $notification->setMessage($message);
-        $notification->setType($type);
-        $notification->setIsRead(false);
-        $notification->setCreatedAt(new \DateTime());
+        $notification = (new Notification())
+            ->setUser($user)
+            ->setTitle($title)
+            ->setMessage($message)
+            ->setType($type)
+            ->setIsRead(false)
+            ->setCreatedAt(new \DateTime());
 
         $entityManager->persist($notification);
     }
 
-    /**
-     * Calcule le nombre de jours ouvrés
-     * entre deux dates.
-     *
-     * Les samedis et dimanches sont exclus.
-     */
     private function countWorkingDays(
         \DateTimeInterface $startDate,
         \DateTimeInterface $endDate
     ): int {
         $count = 0;
-        $current = clone $startDate;
+        $current = \DateTime::createFromInterface($startDate);
 
         while ($current <= $endDate) {
             if ((int) $current->format('N') < 6) {
@@ -380,10 +274,6 @@ class LeaveController
         return $count;
     }
 
-    /**
-     * Formate une demande de congé
-     * pour le frontend React.
-     */
     private function formatLeave(Leave $leave): array
     {
         return [
@@ -392,7 +282,6 @@ class LeaveController
             'start' => $leave->getStartDate()?->format('Y-m-d'),
             'end' => $leave->getEndDate()?->format('Y-m-d'),
             'status' => $leave->getStatus(),
-
             'user' => [
                 'id' => $leave->getUser()?->getId(),
                 'email' => $leave->getUser()?->getEmail(),

@@ -11,6 +11,7 @@ use Symfony\Component\Mailer\MailerInterface;
 use Symfony\Component\Mime\Email;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
+use Symfony\Component\Security\Http\Attribute\IsGranted;
 
 /**
  * Contrôleur dédié à la gestion des utilisateurs par l'administrateur RH.
@@ -22,6 +23,7 @@ use Symfony\Component\Routing\Attribute\Route;
  * - de supprimer un collaborateur 
  * - de générer un mot de passe temporaire sécurisé
  */
+#[IsGranted('ROLE_ADMIN')]
 class AdminUserController
 {
     /**
@@ -135,7 +137,6 @@ class AdminUserController
             // Gestion des erreurs serveur
             return new JsonResponse([
                 'message' => 'Server error',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }
@@ -205,7 +206,6 @@ class AdminUserController
         } catch (\Throwable $e) {
             return new JsonResponse([
                 'message' => 'Server error while updating collaborator',
-                'error' => $e->getMessage(),
             ], 500);
         }
     }

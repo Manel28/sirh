@@ -2,80 +2,125 @@
 
 namespace App\Tests;
 
+use App\Entity\User;
+use App\Repository\UserRepository;
+use Doctrine\ORM\EntityManagerInterface;
+use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
+use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
+use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class AdminUserControllerTest extends WebTestCase
 {
     public function testCreateCollaboratorSuccessfully(): void
     {
         $client = static::createClient();
+        $this->authenticateAdmin($client);
 
-        $payload = [
-            'firstName' => 'Test',
-            'lastName' => 'User',
-            'email' => 'test_' . uniqid() . '@example.com',
-            'jobTitle' => 'Developer',
-            'department' => 'IT',
-            'photo' => '',
-            'isAdmin' => false,
-        ];
-
-        $client->request(
-            'POST',
-            '/api/admin/users',
-            [],
-            [],
-            ['CONTENT_TYPE' => 'application/json'],
-            json_encode($payload)
-        );
+        $payload = $this->collaboratorPayload('test_');
+        $this->requestJson($client, 'POST', '/api/admin/users', $payload);
 
         $this->assertResponseStatusCodeSame(201);
 
         $data = json_decode($client->getResponse()->getContent(), true);
-
-        $this->assertArrayHasKey('message', $data);
-        $this->assertStringContainsString(
-            'Collaborator created successfully',
-            $data['message']
+        $this->assertSame(
+            'Collaborator created successfully. An email has been sent.',
+            $data['message'] ?? null
         );
+
+        $user = static::getContainer()
+            ->get(UserRepository::class)
+            ->findOneBy(['email' => $payload['email']]);
+
+        $this->assertNotNull($user);
+        $this->assertSame($payload['email'], $user->getEmail());
     }
 
     public function testCannotCreateDuplicateEmail(): void
     {
         $client = static::createClient();
+        $this->authenticateAdmin($client);
+        $payload = $this->collaboratorPayload('duplicate_');
 
-        $email = 'duplicate_' . uniqid() . '@example.com';
+        $this->requestJson($client, 'POST', '/api/admin/users', $payload);
+        $this->assertResponseStatusCodeSame(201);
 
-        $payload = [
+        $this->requestJson($client, 'POST', '/api/admin/users', $payload);
+        $this->assertResponseStatusCodeSame(409);
+    }
+
+    public function testDeleteCollaborator(): void
+    {
+        $client = static::createClient();
+        $this->authenticateAdmin($client);
+        $payload = $this->collaboratorPayload('delete_');
+
+        $this->requestJson($client, 'POST', '/api/admin/users', $payload);
+        $this->assertResponseStatusCodeSame(201);
+
+        $user = static::getContainer()
+            ->get(UserRepository::class)
+            ->findOneBy(['email' => $payload['email']]);
+
+        $this->assertNotNull($user);
+        $userId = $user->getId();
+
+        $client->request('DELETE', '/api/admin/users/' . $userId);
+        $this->assertResponseIsSuccessful();
+
+        static::getContainer()->get(EntityManagerInterface::class)->clear();
+        $deletedUser = static::getContainer()->get(UserRepository::class)->find($userId);
+        $this->assertNull($deletedUser);
+    }
+
+    private function authenticateAdmin(KernelBrowser $client): User
+    {
+        $container = static::getContainer();
+        $entityManager = $container->get(EntityManagerInterface::class);
+        $passwordHasher = $container->get(UserPasswordHasherInterface::class);
+
+        $admin = (new User())
+            ->setEmail('admin_' . uniqid() . '@example.com')
+            ->setFirstName('Admin')
+            ->setLastName('Test')
+            ->setRoles(['ROLE_ADMIN']);
+        $admin->setPassword($passwordHasher->hashPassword($admin, 'Admin123!'));
+
+        $entityManager->persist($admin);
+        $entityManager->flush();
+
+        $token = $container->get(JWTTokenManagerInterface::class)->create($admin);
+        $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer ' . $token);
+
+        return $admin;
+    }
+
+    private function collaboratorPayload(string $prefix): array
+    {
+        return [
             'firstName' => 'Test',
             'lastName' => 'User',
-            'email' => $email,
+            'email' => $prefix . uniqid() . '@example.com',
             'jobTitle' => 'Developer',
             'department' => 'IT',
             'photo' => '',
             'isAdmin' => false,
         ];
+    }
 
+    private function requestJson(
+        KernelBrowser $client,
+        string $method,
+        string $uri,
+        array $payload
+    ): void {
         $client->request(
-            'POST',
-            '/api/admin/users',
+            $method,
+            $uri,
             [],
             [],
             ['CONTENT_TYPE' => 'application/json'],
-            json_encode($payload)
+            json_encode($payload, JSON_THROW_ON_ERROR)
         );
-
-        $this->assertResponseStatusCodeSame(201);
-
-        $client->request(
-            'POST',
-            '/api/admin/users',
-            [],
-            [],
-            ['CONTENT_TYPE' => 'application/json'],
-            json_encode($payload)
-        );
-
-        $this->assertResponseStatusCodeSame(409);
     }
 }

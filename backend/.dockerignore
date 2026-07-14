@@ -2,3 +2,6 @@ vendor
 var
 .git
 node_modules
+.env.local
+.env.*.local
+config/jwt

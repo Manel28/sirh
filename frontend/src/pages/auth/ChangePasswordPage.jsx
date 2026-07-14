@@ -5,8 +5,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 // Import d'Axios pour effectuer les requêtes HTTP vers l'API Symfony
-import axios from "axios";
-import { API_BASE_URL } from "../../services/apiConfig";
+import api from "../../services/api";
 
 // Import des icônes utilisées pour afficher ou masquer le mot de passe
 import { Eye, EyeOff } from "lucide-react";
@@ -15,11 +14,11 @@ import { Eye, EyeOff } from "lucide-react";
  * Page permettant à un utilisateur de modifier son mot de passe.
  *
  * Fonctionnalités :
- * - saisie d'un nouveau mot de passe 
- * - confirmation du mot de passe 
- * - vérification de la complexité 
- * - affichage/masquage du mot de passe 
- * - envoi des données à l'API Symfony 
+ * - saisie d'un nouveau mot de passe
+ * - confirmation du mot de passe
+ * - vérification de la complexité
+ * - affichage/masquage du mot de passe
+ * - envoi des données à l'API Symfony
  * - redirection vers le dashboard après modification
  */
 export default function ChangePasswordPage() {
@@ -116,13 +115,9 @@ export default function ChangePasswordPage() {
       setError("");
 
       // Envoi de la requête à l'API Symfony
-      const response = await axios.post(
-        `${API_BASE_URL}/change-password`,
-        {
-          userId: user.id,
-          newPassword: form.newPassword,
-        }
-      );
+      const response = await api.post("/change-password", {
+        newPassword: form.newPassword,
+      });
 
       // Mise à jour de l'utilisateur dans le localStorage
       localStorage.setItem("user", JSON.stringify(response.data.user));

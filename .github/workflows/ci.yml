@@ -34,6 +34,26 @@ jobs:
     name: Backend Symfony
     runs-on: ubuntu-latest
 
+    services:
+      database:
+        image: mariadb:10.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: si_rh_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      APP_ENV: test
+      DATABASE_URL: "mysql://root:root@127.0.0.1:3306/si_rh_test?serverVersion=10.4.32-MariaDB&charset=utf8mb4"
+      MAILER_DSN: "null://null"
+      JWT_SECRET: "ci-only-jwt-secret-8d3a6f1c9e4b7a2d"
+
     defaults:
       run:
         working-directory: backend
@@ -46,10 +66,16 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.4'
-          extensions: intl, pdo_mysql, zip
+          extensions: intl, pdo_mysql, sodium, zip
 
       - name: Install backend dependencies
         run: composer install --no-interaction --prefer-dist
 
       - name: Validate Symfony schema
         run: php bin/console doctrine:schema:validate --skip-sync
+
+      - name: Create test database schema
+        run: php bin/console doctrine:schema:create --env=test --no-interaction
+
+      - name: Run backend tests
+        run: php bin/phpunit --testdox

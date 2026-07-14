@@ -14,7 +14,7 @@ import {
   updateDocument,
   uploadDocument,
 } from "../../services/documentService";
-import { buildBackendUrl } from "../../services/apiConfig";
+import { buildBackendUrl } from "../../services/api";
 
 // Catégories disponibles pour classer les documents RH
 const CATEGORIES = [

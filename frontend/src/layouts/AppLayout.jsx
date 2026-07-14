@@ -53,7 +53,7 @@ export default function AppLayout({ title, children }) {
         }
 
         // Appel au service pour récupérer les notifications de l'utilisateur
-        const data = await getNotifications(user.id);
+        const data = await getNotifications();
 
         // Calcul du nombre de notifications non lues
         const unread = Array.isArray(data)
@@ -97,6 +97,7 @@ export default function AppLayout({ title, children }) {
     if (!confirmed) return;
 
     localStorage.removeItem("user");
+    localStorage.removeItem("token");
     navigate("/");
   };
 

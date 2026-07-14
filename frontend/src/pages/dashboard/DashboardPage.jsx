@@ -12,7 +12,7 @@ import { getLeaves } from "../../services/leaveService";
 
 // Import du service permettant de récupérer les collaborateurs
 import { getCollaborators } from "../../services/userService";
-import { buildBackendUrl } from "../../services/apiConfig";
+import { buildBackendUrl } from "../../services/api";
 
 // Import des icônes utilisées dans le tableau de bord
 import {
@@ -215,11 +215,7 @@ export default function DashboardPage() {
                 {user?.photo ? (
                   // Affichage de la photo si elle existe
                   <img
-                    src={
-                      user.photo.startsWith("http")
-                        ? user.photo
-                        : buildBackendUrl(user.photo)
-                    }
+                    src={buildBackendUrl(user.photo)}
                     alt="Profile"
                     className="h-16 w-16 rounded-2xl border-2 border-white/40 object-cover"
                   />
@@ -377,11 +373,7 @@ export default function DashboardPage() {
                       <div className="flex min-w-0 items-center gap-3">
                         {item.photo ? (
                           <img
-                            src={
-                              item.photo.startsWith("http")
-                                ? item.photo
-                                : buildBackendUrl(item.photo)
-                            }
+                            src={buildBackendUrl(item.photo)}
                             alt="Profile"
                             className="h-11 w-11 rounded-2xl object-cover"
                           />

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import AppLayout from "../../layouts/AppLayout";
 import { getCollaborators } from "../../services/userService";
 import {
@@ -47,6 +47,7 @@ export default function CalendarPage() {
   // Récupération de l'utilisateur connecté
   const user = JSON.parse(localStorage.getItem("user") || "null");
   const currentUserId = user?.id;
+  const isAdmin = user?.roles?.includes("ROLE_ADMIN");
 
   // Initialisation du calendrier sur le mois courant
   const now = new Date();
@@ -111,15 +112,17 @@ export default function CalendarPage() {
    * - récupération des entrées du mois ;
    * - récupération des collaborateurs.
    */
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
 
-      const [entriesData, usersData] = await Promise.all([
-        getWorkEntriesByMonth(month),
-        getCollaborators(),
-      ]);
+      const [entriesData, usersData] = isAdmin
+        ? await Promise.all([
+            getWorkEntriesByMonth(month),
+            getCollaborators(),
+          ])
+        : [await getWorkEntriesByMonth(month), []];
 
       // Stockage des entrées du calendrier
       setEntries(Array.isArray(entriesData) ? entriesData : []);
@@ -136,7 +139,7 @@ export default function CalendarPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAdmin, month]);
 
   /**
    * Recharge automatiquement le calendrier
@@ -146,7 +149,7 @@ export default function CalendarPage() {
     if (currentUserId) {
       loadData();
     }
-  }, [month, currentUserId]);
+  }, [currentUserId, loadData]);
 
   /**
    * Transforme les entrées en objet clé/valeur.
@@ -401,6 +404,8 @@ export default function CalendarPage() {
         />
 
         {/* Zone de recherche pour le planning de l'équipe */}
+        {isAdmin && (
+          <>
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
@@ -441,6 +446,8 @@ export default function CalendarPage() {
           onChange={handleChange}
           loading={loading}
         />
+          </>
+        )}
       </div>
     </AppLayout>
   );
