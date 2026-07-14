@@ -50,7 +50,7 @@ jobs:
 
     env:
       APP_ENV: test
-      DATABASE_URL: "mysql://root:root@127.0.0.1:3306/si_rh_test?serverVersion=10.4.32-MariaDB&charset=utf8mb4"
+      DATABASE_URL: "mysql://root:root@127.0.0.1:3306/si_rh?serverVersion=10.4.32-MariaDB&charset=utf8mb4"
       MAILER_DSN: "null://null"
       JWT_SECRET: "ci-only-jwt-secret-8d3a6f1c9e4b7a2d"
 
