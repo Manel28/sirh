@@ -14,8 +14,12 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
+/**
+ * Gere le cycle complet d'une demande de conge : creation, validation et notification.
+ */
 class LeaveController
 {
+    // Liste blanche des types acceptes par le backend, independamment du formulaire React.
     private const LEAVE_TYPES = [
         'Paid Leave',
         'Unpaid Leave',
@@ -37,6 +41,7 @@ class LeaveController
         #[CurrentUser] User $user,
         LeaveRepository $leaveRepository
     ): JsonResponse {
+        // Un RH voit toutes les demandes ; un collaborateur ne voit que les siennes.
         $leaves = in_array('ROLE_ADMIN', $user->getRoles(), true)
             ? $leaveRepository->findBy([], ['id' => 'DESC'])
             : $leaveRepository->findBy(['user' => $user], ['id' => 'DESC']);
@@ -59,6 +64,7 @@ class LeaveController
         LeaveRepository $leaveRepository
     ): JsonResponse {
         try {
+            // Lecture du JSON puis verification des champs et des valeurs autorisees.
             $data = json_decode($request->getContent(), true);
             $type = is_array($data) ? (string) ($data['type'] ?? '') : '';
             $start = is_array($data) ? (string) ($data['start'] ?? '') : '';
@@ -99,6 +105,7 @@ class LeaveController
                 ], 409);
             }
 
+            // Le service metier compte uniquement les jours du lundi au vendredi.
             $requestedDays = $this->leaveDurationCalculator->countWorkingDays(
                 $startDate,
                 $endDate
@@ -114,6 +121,7 @@ class LeaveController
                 return new JsonResponse(['message' => 'Insufficient leave balance.'], 400);
             }
 
+            // Toute nouvelle demande est creee avec le statut Pending.
             $leave = (new Leave())
                 ->setType($type)
                 ->setStartDate($startDate)
@@ -123,6 +131,7 @@ class LeaveController
 
             $entityManager->persist($leave);
 
+            // Chaque responsable RH recoit une notification liee a la nouvelle demande.
             $admins = $userRepository->createQueryBuilder('u')
                 ->where('u.roles LIKE :role')
                 ->setParameter('role', '%ROLE_ADMIN%')
@@ -146,6 +155,7 @@ class LeaveController
                 );
             }
 
+            // Un seul flush enregistre la demande et toutes les notifications preparees.
             $entityManager->flush();
 
             return new JsonResponse([
@@ -167,6 +177,7 @@ class LeaveController
         EntityManagerInterface $entityManager
     ): JsonResponse {
         try {
+            // Le repository retrouve l'entite a partir de l'id place dans l'URL.
             $leave = $leaveRepository->find($id);
 
             if (!$leave) {
@@ -192,6 +203,7 @@ class LeaveController
 
             $isAdmin = in_array('ROLE_ADMIN', $currentUser->getRoles(), true);
 
+            // Seul le RH approuve/refuse ; le proprietaire peut uniquement annuler sa demande.
             if (in_array($newStatus, ['Approved', 'Rejected'], true) && !$isAdmin) {
                 return new JsonResponse(['message' => 'Administrator access required.'], 403);
             }
@@ -205,6 +217,7 @@ class LeaveController
             }
 
             if ($newStatus === 'Approved' && $leave->getType() === 'Paid Leave') {
+                // Le solde est debite seulement au moment de l'approbation du conge paye.
                 $requestedDays = $this->leaveDurationCalculator->countWorkingDays(
                     $leave->getStartDate(),
                     $leave->getEndDate()
@@ -221,6 +234,7 @@ class LeaveController
 
             $leave->setStatus($newStatus);
 
+            // Le collaborateur est informe du nouveau statut dans l'application.
             $this->createNotification(
                 $entityManager,
                 $owner,
@@ -254,6 +268,7 @@ class LeaveController
         string $message,
         string $type
     ): void {
+        // persist prepare l'INSERT ; le controleur appelant effectue ensuite le flush commun.
         $notification = (new Notification())
             ->setUser($user)
             ->setTitle($title)
@@ -267,6 +282,7 @@ class LeaveController
 
     private function formatLeave(Leave $leave): array
     {
+        // Normalise l'entite et ses dates avant la reponse JSON envoyee a React.
         return [
             'id' => $leave->getId(),
             'type' => $leave->getType(),

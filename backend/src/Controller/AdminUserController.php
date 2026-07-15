@@ -22,6 +22,9 @@ use Symfony\Component\Security\Http\Attribute\IsGranted;
  * - de modifier un collaborateur 
  * - de supprimer un collaborateur 
  * - de générer un mot de passe temporaire sécurisé
+ *
+ * L'attribut IsGranted s'applique a toutes les routes de la classe : le
+ * firewall doit identifier un utilisateur ROLE_ADMIN avant leur execution.
  */
 #[IsGranted('ROLE_ADMIN')]
 class AdminUserController
@@ -57,7 +60,7 @@ class AdminUserController
      * Crée un nouveau collaborateur.
      *
      * Le mot de passe temporaire est généré automatiquement,
-     * chiffré, puis envoyé par email à l'utilisateur.
+     * haché, puis envoyé en clair uniquement par email à l'utilisateur.
      */
     #[Route('/api/admin/users', name: 'api_admin_users_create', methods: ['POST'])]
     public function createUser(
@@ -101,7 +104,7 @@ class AdminUserController
             // Attribution du rôle selon la case Admin/RH cochée ou non
             $user->setRoles(!empty($data['isAdmin']) ? ['ROLE_ADMIN'] : ['ROLE_USER']);
 
-            // Chiffrement du mot de passe temporaire
+            // Hachage non reversible du mot de passe temporaire avant stockage
             $user->setPassword($passwordHasher->hashPassword($user, $temporaryPassword));
 
             // Oblige l'utilisateur à changer son mot de passe à la première connexion

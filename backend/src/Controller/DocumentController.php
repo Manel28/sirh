@@ -16,6 +16,9 @@ use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 use Symfony\Component\Security\Http\Attribute\IsGranted;
 
+/**
+ * Gere les metadonnees Doctrine et les fichiers PDF stockes sur le serveur.
+ */
 class DocumentController extends AbstractController
 {
     #[Route('/api/documents', methods: ['GET'])]
@@ -23,6 +26,7 @@ class DocumentController extends AbstractController
         #[CurrentUser] User $user,
         DocumentRepository $documentRepository
     ): JsonResponse {
+        // Le role determine le filtre : tous les documents pour le RH, les siens sinon.
         $documents = in_array('ROLE_ADMIN', $user->getRoles(), true)
             ? $documentRepository->findBy([], ['createdAt' => 'DESC'])
             : $documentRepository->findBy(['user' => $user], ['createdAt' => 'DESC']);
@@ -34,6 +38,7 @@ class DocumentController extends AbstractController
     }
 
     #[Route('/api/documents', methods: ['POST'])]
+    // IsGranted bloque l'appel avant cette methode si le JWT n'appartient pas a un RH.
     #[IsGranted('ROLE_ADMIN')]
     public function upload(
         Request $request,
@@ -41,6 +46,7 @@ class DocumentController extends AbstractController
         EntityManagerInterface $entityManager
     ): JsonResponse {
         try {
+            // Un upload utilise multipart/form-data : metadonnees et fichier sont separes.
             $title = trim((string) $request->request->get('title', ''));
             $category = trim((string) $request->request->get('category', ''));
             $userId = $request->request->get('userId');
@@ -64,6 +70,7 @@ class DocumentController extends AbstractController
                 return new JsonResponse(['message' => $message], 400);
             }
 
+            // L'id sert uniquement a retrouver l'entite User cible cote backend.
             $user = $userRepository->find($userId);
 
             if (!$user) {
@@ -80,6 +87,7 @@ class DocumentController extends AbstractController
                 return new JsonResponse(['message' => 'The PDF must be smaller than 10MB'], 400);
             }
 
+            // Le fichier recoit un nom aleatoire pour eviter les collisions et les noms dangereux.
             $uploadDir = $this->getParameter('kernel.project_dir') . '/public/uploads/documents';
 
             if (!is_dir($uploadDir) && !mkdir($uploadDir, 0755, true) && !is_dir($uploadDir)) {
@@ -89,6 +97,7 @@ class DocumentController extends AbstractController
             $fileName = bin2hex(random_bytes(16)) . '.pdf';
             $file->move($uploadDir, $fileName);
 
+            // L'entite Document stocke les metadonnees ; le contenu reste dans public/uploads.
             $document = (new Document())
                 ->setTitle($title)
                 ->setCategory($category)
@@ -108,6 +117,7 @@ class DocumentController extends AbstractController
 
             $entityManager->persist($document);
             $entityManager->persist($notification);
+            // flush execute ensemble les INSERT du document et de sa notification.
             $entityManager->flush();
 
             return new JsonResponse([
@@ -129,6 +139,7 @@ class DocumentController extends AbstractController
         EntityManagerInterface $entityManager
     ): JsonResponse {
         try {
+            // PUT modifie les metadonnees et le proprietaire, sans remplacer le PDF.
             $document = $documentRepository->find($id);
 
             if (!$document) {
@@ -178,6 +189,7 @@ class DocumentController extends AbstractController
             $uploadDir = realpath($this->getParameter('kernel.project_dir') . '/public/uploads/documents');
             $filePath = realpath($this->getParameter('kernel.project_dir') . '/public' . $document->getFilePath());
 
+            // realpath et le prefixe verifient que la suppression reste dans le dossier autorise.
             if (
                 $uploadDir &&
                 $filePath &&
@@ -186,6 +198,7 @@ class DocumentController extends AbstractController
                 unlink($filePath);
             }
 
+            // Supprime ensuite la ligne Doctrine correspondant au fichier.
             $entityManager->remove($document);
             $entityManager->flush();
 
@@ -197,6 +210,7 @@ class DocumentController extends AbstractController
 
     private function formatDocument(Document $document): array
     {
+        // Transforme l'entite et sa relation User en JSON sans exposer l'objet Doctrine.
         $owner = $document->getUser();
 
         return [

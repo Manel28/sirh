@@ -10,16 +10,23 @@ use Symfony\Bundle\FrameworkBundle\KernelBrowser;
 use Symfony\Bundle\FrameworkBundle\Test\WebTestCase;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
+/**
+ * Tests fonctionnels : WebTestCase demarre Symfony, appelle l'API HTTP et utilise
+ * la base de test afin de verifier le comportement complet du controleur.
+ */
 class AdminUserControllerTest extends WebTestCase
 {
     public function testCreateCollaboratorSuccessfully(): void
     {
+        // Arrange : client HTTP authentifie et donnees uniques.
         $client = static::createClient();
         $this->authenticateAdmin($client);
 
         $payload = $this->collaboratorPayload('test_');
+        // Act : simulation du POST effectue normalement par Axios.
         $this->requestJson($client, 'POST', '/api/admin/users', $payload);
 
+        // Assert : verification du code HTTP, du JSON puis de la base de donnees.
         $this->assertResponseStatusCodeSame(201);
 
         $data = json_decode($client->getResponse()->getContent(), true);
@@ -75,6 +82,7 @@ class AdminUserControllerTest extends WebTestCase
 
     private function authenticateAdmin(KernelBrowser $client): User
     {
+        // Cree un administrateur dans la base de test puis genere son JWT.
         $container = static::getContainer();
         $entityManager = $container->get(EntityManagerInterface::class);
         $passwordHasher = $container->get(UserPasswordHasherInterface::class);
@@ -90,6 +98,7 @@ class AdminUserControllerTest extends WebTestCase
         $entityManager->flush();
 
         $token = $container->get(JWTTokenManagerInterface::class)->create($admin);
+        // Le client de test enverra ce Bearer token sur les prochaines requetes.
         $client->setServerParameter('HTTP_AUTHORIZATION', 'Bearer ' . $token);
 
         return $admin;
@@ -114,6 +123,7 @@ class AdminUserControllerTest extends WebTestCase
         string $uri,
         array $payload
     ): void {
+        // Helper commun qui reproduit une requete Axios avec un body JSON.
         $client->request(
             $method,
             $uri,

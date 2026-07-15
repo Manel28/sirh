@@ -1,16 +1,7 @@
-export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8001/api";
-
-export const BACKEND_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, "");
-
-export const buildBackendUrl = (path) => {
-  if (!path) {
-    return "";
-  }
-
-  if (path.startsWith("http")) {
-    return path;
-  }
-
-  return `${BACKEND_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
-};
+// Reexport de compatibilite : la configuration HTTP reste definie une seule fois
+// dans api.js afin d'eviter deux URL de backend differentes.
+export {
+  API_BASE_URL,
+  BACKEND_URL as BACKEND_BASE_URL,
+  buildBackendUrl,
+} from "./api";

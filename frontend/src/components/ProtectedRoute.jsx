@@ -5,7 +5,8 @@ export default function ProtectedRoute({ children }) {
   const user = localStorage.getItem("user");
   const token = localStorage.getItem("token");
 
-  // Vérification de l'authentification
+  // Garde de navigation cote React : elle evite d'afficher une page privee.
+  // La securite reelle reste assuree par le firewall JWT du backend Symfony.
   if (!user || !token) {
     // Redirection vers la page de connexion si aucun utilisateur n'est connecté
     return <Navigate to="/" replace />;

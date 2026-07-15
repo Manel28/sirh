@@ -9,6 +9,9 @@ use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
+/**
+ * Expose uniquement les notifications appartenant a l'utilisateur authentifie.
+ */
 class NotificationController
 {
     #[Route('/api/notifications', methods: ['GET'])]
@@ -16,6 +19,7 @@ class NotificationController
         #[CurrentUser] User $user,
         NotificationRepository $notificationRepository
     ): JsonResponse {
+        // CurrentUser vient du JWT : aucun userId transmis par React n'est necessaire.
         $notifications = $notificationRepository->findBy(
             ['user' => $user],
             ['id' => 'DESC']
@@ -42,11 +46,13 @@ class NotificationController
     ): JsonResponse {
         $notification = $notificationRepository->find($id);
 
+        // Cette verification empeche un utilisateur de modifier la notification d'un autre.
         if (!$notification || $notification->getUser()?->getId() !== $user->getId()) {
             return new JsonResponse(['message' => 'Notification not found'], 404);
         }
 
         $notification->setIsRead(true);
+        // L'entite existe deja : Doctrine detecte le changement et flush lance l'UPDATE.
         $entityManager->flush();
 
         return new JsonResponse(['message' => 'Notification marked as read']);
@@ -58,6 +64,7 @@ class NotificationController
         NotificationRepository $notificationRepository,
         EntityManagerInterface $entityManager
     ): JsonResponse {
+        // Le repository ne charge que les notifications non lues de CurrentUser.
         $notifications = $notificationRepository->findBy([
             'user' => $user,
             'isRead' => false,
@@ -67,6 +74,7 @@ class NotificationController
             $notification->setIsRead(true);
         }
 
+        // Un seul flush synchronise toutes les modifications avec la base.
         $entityManager->flush();
 
         return new JsonResponse(['message' => 'All notifications marked as read']);

@@ -1,8 +1,10 @@
 nelmio_cors:
     defaults:
+        # Autorise uniquement les origines correspondant a CORS_ALLOW_ORIGIN.
         origin_regex: true
         allow_origin: ['%env(CORS_ALLOW_ORIGIN)%']
         allow_methods: ['GET', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE']
+        # Authorization est necessaire pour transporter le JWT Bearer.
         allow_headers: ['Content-Type', 'Authorization']
         expose_headers: ['Link']
         max_age: 3600

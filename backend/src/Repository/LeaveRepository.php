@@ -7,6 +7,9 @@ use App\Entity\User;
 use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
+/**
+ * Repository Doctrine specialise dans les recherches sur les demandes de conge.
+ */
 class LeaveRepository extends ServiceEntityRepository
 {
     public function __construct(ManagerRegistry $registry)
@@ -14,11 +17,13 @@ class LeaveRepository extends ServiceEntityRepository
         parent::__construct($registry, Leave::class);
     }
 
-    public function hasOverlappingLeave(            
+    /** Verifie si une demande Pending ou Approved chevauche la periode choisie. */
+    public function hasOverlappingLeave(
         User $user,
         \DateTimeInterface $startDate,
         \DateTimeInterface $endDate
     ): bool {
+        // Les valeurs sont liees avec setParameter : elles ne sont pas concatenees au SQL.
         $count = $this->createQueryBuilder('l')
             ->select('COUNT(l.id)')
             ->where('l.user = :user')

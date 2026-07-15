@@ -10,8 +10,12 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
+/**
+ * Consulte et modifie le profil de l'utilisateur identifie par son JWT.
+ */
 class ProfileController
 {
+    // Retourne directement le profil de CurrentUser, sans accepter d'id du frontend.
     #[Route('/api/profile', name: 'api_profile_show', methods: ['GET'])]
     public function getProfile(#[CurrentUser] User $user, Request $request): JsonResponse
     {
@@ -25,6 +29,7 @@ class ProfileController
         EntityManagerInterface $entityManager
     ): JsonResponse {
         try {
+            // Cette route recoit un FormData : champs texte dans request et photo dans files.
             $firstName = trim((string) $request->request->get('firstName', ''));
             $lastName = trim((string) $request->request->get('lastName', ''));
 
@@ -39,6 +44,7 @@ class ProfileController
             $photoFile = $request->files->get('photoFile');
 
             if ($photoFile) {
+                // La liste blanche MIME et la taille maximale bloquent les fichiers inattendus.
                 $extensionsByMime = [
                     'image/jpeg' => 'jpg',
                     'image/png' => 'png',
@@ -65,6 +71,7 @@ class ProfileController
                 $user->setPhoto('/uploads/' . $newFilename);
             }
 
+            // User existe deja en base et est suivi par Doctrine : pas de persist necessaire.
             $entityManager->flush();
 
             return new JsonResponse([
@@ -78,6 +85,7 @@ class ProfileController
 
     private function formatUser(User $user, Request $request): array
     {
+        // Convertit l'entite PHP en structure JSON simple comprise par React.
         return [
             'id' => $user->getId(),
             'firstName' => $user->getFirstName(),

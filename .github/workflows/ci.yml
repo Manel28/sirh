@@ -1,5 +1,6 @@
 name: CI - SIRH
 
+# Le pipeline est declenche a chaque push ou pull request sur la branche principale.
 on:
   push:
     branches: [ main, master ]
@@ -7,6 +8,7 @@ on:
     branches: [ main, master ]
 
 jobs:
+  # Premier job : verifie que le frontend peut produire un build de production.
   frontend:
     name: Frontend React
     runs-on: ubuntu-latest
@@ -30,11 +32,13 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+  # Second job : lance Symfony et PHPUnit avec une base MariaDB dediee aux tests.
   backend:
     name: Backend Symfony
     runs-on: ubuntu-latest
 
     services:
+      # Base ephemere creee uniquement pendant l'execution GitHub Actions.
       database:
         image: mariadb:10.4
         env:
@@ -49,6 +53,7 @@ jobs:
           --health-retries=10
 
     env:
+      # Ces valeurs sont reservees a la CI et ne contiennent aucun secret de production.
       APP_ENV: test
       DATABASE_URL: "mysql://root:root@127.0.0.1:3306/si_rh?serverVersion=10.4.32-MariaDB&charset=utf8mb4"
       MAILER_DSN: "null://null"

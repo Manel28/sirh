@@ -8,6 +8,8 @@ use Doctrine\Persistence\ManagerRegistry;
 
 /**
  * @extends ServiceEntityRepository<Document>
+ *
+ * Donne aux controleurs les methodes Doctrine de recherche des documents.
  */
 class DocumentRepository extends ServiceEntityRepository
 {

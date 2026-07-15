@@ -10,6 +10,10 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
+/**
+ * Route d'initialisation utilisee une seule fois pour creer le premier compte RH.
+ * Elle est publique techniquement, mais protegee par un secret d'environnement.
+ */
 class SetupController
 {
     #[Route('/api/setup-admin', methods: ['GET', 'POST'])]
@@ -19,6 +23,7 @@ class SetupController
         UserPasswordHasherInterface $passwordHasher,
         EntityManagerInterface $entityManager
     ): JsonResponse {
+        // Le secret fourni doit correspondre exactement a SETUP_SECRET.
         $expectedSecret = $_ENV['SETUP_SECRET'] ?? getenv('SETUP_SECRET') ?: null;
         $providedSecret = $request->query->get('secret') ?: $request->headers->get('X-Setup-Secret');
 
@@ -55,6 +60,7 @@ class SetupController
         $admin->setMustChangePassword(false);
         $admin->setPassword($passwordHasher->hashPassword($admin, $password));
 
+        // persist inscrit la nouvelle entite dans l'unite de travail ; flush lance l'INSERT SQL.
         $entityManager->persist($admin);
         $entityManager->flush();
 

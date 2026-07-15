@@ -11,6 +11,9 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
+/**
+ * Remplace le mot de passe temporaire lors de la premiere connexion.
+ */
 class ChangePasswordController
 {
     public function __construct(private readonly PasswordPolicy $passwordPolicy)
@@ -19,12 +22,14 @@ class ChangePasswordController
 
     #[Route('/api/change-password', name: 'api_change_password', methods: ['POST'])]
     public function changePassword(
+        // CurrentUser vient du JWT deja verifie par le firewall Symfony.
         #[CurrentUser] User $user,
         Request $request,
         UserPasswordHasherInterface $passwordHasher,
         EntityManagerInterface $entityManager
     ): JsonResponse {
         try {
+            // React envoie uniquement le nouveau mot de passe dans le body JSON.
             $data = json_decode($request->getContent(), true);
             $password = is_array($data) ? (string) ($data['newPassword'] ?? '') : '';
 
@@ -38,6 +43,8 @@ class ChangePasswordController
                 ], 400);
             }
 
+            // PasswordHasher produit un hash non reversible. L'entite User est
+            // deja suivie par Doctrine : flush suffit pour executer l'UPDATE SQL.
             $user->setPassword($passwordHasher->hashPassword($user, $password));
             $user->setMustChangePassword(false);
             $entityManager->flush();

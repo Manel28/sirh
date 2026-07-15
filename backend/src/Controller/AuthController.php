@@ -9,8 +9,12 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Routing\Attribute\Route;
 
+/**
+ * Point d'entree de la connexion : verifie les identifiants puis cree le JWT.
+ */
 class AuthController
 {
+    // Repond au precontrole CORS envoye par le navigateur avant le POST reel.
     #[Route('/api/login', name: 'api_login_options', methods: ['OPTIONS'])]
     public function loginOptions(): JsonResponse
     {
@@ -25,6 +29,7 @@ class AuthController
         JWTTokenManagerInterface $jwtManager
     ): JsonResponse {
         try {
+            // Le body JSON envoye par authService est transforme en tableau PHP.
             $data = json_decode($request->getContent(), true);
 
             if (!is_array($data)) {
@@ -38,6 +43,7 @@ class AuthController
                 return new JsonResponse(['message' => 'Email and password are required.'], 400);
             }
 
+            // Le repository interroge la table user avec Doctrine a partir de l'email.
             $user = $userRepository->findOneBy(['email' => $email]);
 
             // Use the same response for an unknown email and a wrong password.
@@ -45,6 +51,8 @@ class AuthController
                 return new JsonResponse(['message' => 'Invalid email or password.'], 401);
             }
 
+            // Le mot de passe est valide : LexikJWT signe un token puis Symfony
+            // renvoie a React le token et les donnees utiles a l'interface.
             return new JsonResponse([
                 'message' => 'Login successful',
                 'token' => $jwtManager->create($user),

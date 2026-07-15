@@ -1,5 +1,8 @@
 lexik_jwt_authentication:
+    # Cle secrete lue depuis l'environnement : elle ne doit jamais etre dans Git.
     secret_key: '%env(JWT_SECRET)%'
+    # Duree de validite du token en secondes : 3600 = une heure.
     token_ttl: 3600
     encoder:
+        # HS256 signe le token afin que toute modification soit detectee.
         signature_algorithm: HS256

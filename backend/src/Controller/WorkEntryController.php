@@ -13,6 +13,9 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\Routing\Attribute\Route;
 use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
+/**
+ * Gere le calendrier mensuel : presence, teletravail, formation, absence et conges.
+ */
 class WorkEntryController
 {
     #[Route('/api/work-entries', methods: ['GET'])]
@@ -24,6 +27,7 @@ class WorkEntryController
         UserRepository $userRepository
     ): JsonResponse {
         try {
+            // Le frontend demande un mois au format YYYY-MM.
             $month = (string) $request->query->get('month', '');
 
             if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $month)) {
@@ -42,6 +46,7 @@ class WorkEntryController
             $requestedUserId = $request->query->get('userId');
 
             if ($isAdmin && $requestedUserId) {
+                // Seul le RH peut filtrer le calendrier sur un autre collaborateur.
                 $targetUser = $userRepository->find($requestedUserId);
 
                 if (!$targetUser) {
@@ -49,6 +54,7 @@ class WorkEntryController
                 }
             }
 
+            // QueryBuilder cree une requete Doctrine parametree sur la periode demandee.
             $entryQuery = $workEntryRepository->createQueryBuilder('w')
                 ->where('w.workDate BETWEEN :start AND :end')
                 ->setParameter('start', $start)
@@ -101,6 +107,7 @@ class WorkEntryController
                         static fn (array $row) => ($row['userId'] . '_' . $row['date']) !== $key
                     ));
 
+                    // Un conge approuve remplace toute saisie manuelle par le code LV.
                     $data[] = [
                         'id' => null,
                         'date' => $dateString,
@@ -117,6 +124,7 @@ class WorkEntryController
                 static fn (array $a, array $b) => [$a['userId'], $a['date']] <=> [$b['userId'], $b['date']]
             );
 
+            // React recoit une liste deja fusionnee et triee par utilisateur puis par date.
             return new JsonResponse($data);
         } catch (\Throwable) {
             return new JsonResponse(['message' => 'Server error while loading work entries.'], 500);
@@ -132,6 +140,7 @@ class WorkEntryController
         LeaveRepository $leaveRepository
     ): JsonResponse {
         try {
+            // Le body JSON contient une date et le code choisi dans le select du calendrier.
             $data = json_decode($request->getContent(), true);
 
             if (!is_array($data) || !isset($data['date']) || !array_key_exists('code', $data)) {
@@ -163,6 +172,7 @@ class WorkEntryController
                 ->getOneOrNullResult();
 
             if ($approvedLeave) {
+                // Une journee couverte par un conge approuve est verrouillee.
                 return new JsonResponse([
                     'message' => 'This day is covered by an approved leave.',
                 ], 409);
@@ -174,6 +184,7 @@ class WorkEntryController
             ]);
 
             if ($code === '') {
+                // Un code vide signifie que l'utilisateur efface son ancienne saisie.
                 if ($existing) {
                     $entityManager->remove($existing);
                     $entityManager->flush();
@@ -183,8 +194,10 @@ class WorkEntryController
             }
 
             if ($existing) {
+                // Mise a jour de l'entite deja suivie par Doctrine.
                 $existing->setCode($code);
             } else {
+                // Nouvelle date : persist ajoute l'entite a l'unite de travail Doctrine.
                 $entry = (new WorkEntry())
                     ->setUser($user)
                     ->setWorkDate($date)
@@ -192,6 +205,7 @@ class WorkEntryController
                 $entityManager->persist($entry);
             }
 
+            // flush realise l'INSERT, l'UPDATE ou le DELETE prepare ci-dessus.
             $entityManager->flush();
 
             return new JsonResponse(['message' => 'Saved successfully']);
