@@ -228,8 +228,16 @@ export default function CalendarPage() {
     let ab = 0;
     let lv = 0;
 
-    filteredEmployees.forEach((employee) => {
-      const code = entriesMap[`${employee.id}_${todayString}`];
+    const employeeIds = new Set(
+      filteredEmployees.map((employee) => Number(employee.id))
+    );
+
+    if (currentUserId !== undefined && currentUserId !== null) {
+      employeeIds.add(Number(currentUserId));
+    }
+
+    employeeIds.forEach((employeeId) => {
+      const code = entriesMap[`${employeeId}_${todayString}`];
 
       if (code === "SS") ss += 1;
       if (code === "TT") tt += 1;
@@ -239,14 +247,14 @@ export default function CalendarPage() {
     });
 
     return {
-      total: filteredEmployees.length,
+      total: employeeIds.size,
       ss,
       tt,
       tr,
       ab,
       lv,
     };
-  }, [filteredEmployees, entriesMap]);
+  }, [filteredEmployees, entriesMap, currentUserId]);
 
   // Change uniquement le mois tout en gardant l'année sélectionnée
   const handleMonthChange = (newMonth) => {

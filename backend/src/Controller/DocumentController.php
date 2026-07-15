@@ -52,6 +52,18 @@ class DocumentController extends AbstractController
                 return new JsonResponse(['message' => 'Missing required fields'], 400);
             }
 
+            if (!$file->isValid()) {
+                $message = in_array(
+                    $file->getError(),
+                    [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE],
+                    true
+                )
+                    ? 'The PDF must be smaller than 10MB'
+                    : 'The PDF upload failed';
+
+                return new JsonResponse(['message' => $message], 400);
+            }
+
             $user = $userRepository->find($userId);
 
             if (!$user) {

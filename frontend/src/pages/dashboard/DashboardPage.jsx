@@ -318,7 +318,7 @@ export default function DashboardPage() {
 
         {/* Contenu spécifique à l'administrateur */}
         {isAdmin ? (
-          <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+          <section className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
             {/* Panneau des congés récents */}
             <Panel
               title="Recent leave requests"
@@ -333,14 +333,14 @@ export default function DashboardPage() {
                       className="flex items-center justify-between gap-4 py-4"
                     >
                       {/* Informations sur la demande */}
-                      <div>
-                        <p className="font-bold text-slate-900">
+                      <div className="min-w-0">
+                        <p className="truncate font-bold text-slate-900">
                           {leave.user?.firstName ||
                             leave.firstName ||
                             "Employee"}{" "}
                           {leave.user?.lastName || leave.lastName || ""}
                         </p>
-                        <p className="text-sm text-slate-500">
+                        <p className="truncate text-sm text-slate-500">
                           {formatShortDate(leave.start)} →{" "}
                           {formatShortDate(leave.end)}
                         </p>
@@ -396,7 +396,7 @@ export default function DashboardPage() {
                       </div>
 
                       {/* Département du collaborateur */}
-                      <span className="rounded-full bg-orange-50 px-3 py-1 text-xs font-bold text-orange-600">
+                      <span className="shrink-0 rounded-full bg-orange-50 px-3 py-1 text-xs font-bold text-orange-600">
                         {item.department || "Team"}
                       </span>
                     </div>
@@ -512,7 +512,7 @@ function DashboardCard({ title, description, icon: Icon, onClick }) {
  */
 function Panel({ title, action, onClick, children }) {
   return (
-    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
+    <div className="min-w-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_10px_35px_rgba(15,23,42,0.06)]">
       {/* En-tête du panneau */}
       <div className="flex items-center justify-between border-b border-slate-100 bg-gradient-to-r from-slate-50 to-orange-50/40 px-6 py-5">
         <h3 className="text-lg font-black text-slate-900">{title}</h3>
@@ -547,7 +547,7 @@ function StatusBadge({ status }) {
 
   return (
     <span
-      className={`rounded-full border px-3 py-1 text-xs font-bold ${
+      className={`shrink-0 rounded-full border px-3 py-1 text-xs font-bold ${
         styles[status] || "bg-slate-50 text-slate-600 border-slate-200"
       }`}
     >

@@ -4,6 +4,9 @@ RUN apt-get update && apt-get install -y \
     git unzip libicu-dev libzip-dev zip \
     && docker-php-ext-install intl pdo pdo_mysql zip
 
+RUN printf 'upload_max_filesize=10M\npost_max_size=12M\n' \
+    > /usr/local/etc/php/conf.d/uploads.ini
+
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 ENV APP_ENV=prod \

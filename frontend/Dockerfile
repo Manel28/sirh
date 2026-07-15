@@ -8,6 +8,9 @@ RUN npm install
 
 COPY . .
 
+ARG VITE_API_URL=http://127.0.0.1:8001/api
+ENV VITE_API_URL=${VITE_API_URL}
+
 RUN npm run build
 
 FROM nginx:alpine
