@@ -3,6 +3,7 @@
 namespace App\Controller;
 
 use App\Entity\User;
+use App\Service\PasswordPolicy;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -12,6 +13,10 @@ use Symfony\Component\Security\Http\Attribute\CurrentUser;
 
 class ChangePasswordController
 {
+    public function __construct(private readonly PasswordPolicy $passwordPolicy)
+    {
+    }
+
     #[Route('/api/change-password', name: 'api_change_password', methods: ['POST'])]
     public function changePassword(
         #[CurrentUser] User $user,
@@ -27,13 +32,7 @@ class ChangePasswordController
                 return new JsonResponse(['message' => 'New password is required.'], 400);
             }
 
-            if (
-                strlen($password) < 8 ||
-                !preg_match('/[A-Z]/', $password) ||
-                !preg_match('/[a-z]/', $password) ||
-                !preg_match('/[0-9]/', $password) ||
-                !preg_match('/[\W_]/', $password)
-            ) {
+            if (!$this->passwordPolicy->isValid($password)) {
                 return new JsonResponse([
                     'message' => 'Le mot de passe doit contenir au moins 8 caracteres, une majuscule, une minuscule, un chiffre et un caractere special.',
                 ], 400);

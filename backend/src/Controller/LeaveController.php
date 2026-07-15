@@ -7,6 +7,7 @@ use App\Entity\Notification;
 use App\Entity\User;
 use App\Repository\LeaveRepository;
 use App\Repository\UserRepository;
+use App\Service\LeaveDurationCalculator;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -25,6 +26,11 @@ class LeaveController
         'Half-day Afternoon',
         'Other Absence',
     ];
+
+    public function __construct(
+        private readonly LeaveDurationCalculator $leaveDurationCalculator
+    ) {
+    }
 
     #[Route('/api/leaves', methods: ['GET'])]
     public function getLeaves(
@@ -93,7 +99,10 @@ class LeaveController
                 ], 409);
             }
 
-            $requestedDays = $this->countWorkingDays($startDate, $endDate);
+            $requestedDays = $this->leaveDurationCalculator->countWorkingDays(
+                $startDate,
+                $endDate
+            );
 
             if ($requestedDays <= 0) {
                 return new JsonResponse([
@@ -196,7 +205,7 @@ class LeaveController
             }
 
             if ($newStatus === 'Approved' && $leave->getType() === 'Paid Leave') {
-                $requestedDays = $this->countWorkingDays(
+                $requestedDays = $this->leaveDurationCalculator->countWorkingDays(
                     $leave->getStartDate(),
                     $leave->getEndDate()
                 );
@@ -254,24 +263,6 @@ class LeaveController
             ->setCreatedAt(new \DateTime());
 
         $entityManager->persist($notification);
-    }
-
-    private function countWorkingDays(
-        \DateTimeInterface $startDate,
-        \DateTimeInterface $endDate
-    ): int {
-        $count = 0;
-        $current = \DateTime::createFromInterface($startDate);
-
-        while ($current <= $endDate) {
-            if ((int) $current->format('N') < 6) {
-                $count++;
-            }
-
-            $current->modify('+1 day');
-        }
-
-        return $count;
     }
 
     private function formatLeave(Leave $leave): array
